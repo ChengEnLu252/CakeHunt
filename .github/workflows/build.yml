@@ -1,0 +1,55 @@
+name: Build CakeHunt
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          pip install pyinstaller
+          pip install -r requirement.txt
+      - name: Build exe
+        run: |
+          pyinstaller --onefile --noconsole `
+            --add-data "src/www;www" `
+            --add-data "src/assets;assets" `
+            --name "CakeHunt" `
+            src/settings.py
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: CakeHunt-Windows
+          path: dist/CakeHunt.exe
+
+  build-mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          pip install pyinstaller
+          pip install -r requirement.txt
+      - name: Build app
+        run: |
+          pyinstaller --onefile --windowed \
+            --add-data "src/www:www" \
+            --add-data "src/assets:assets" \
+            --name "CakeHunt" \
+            src/settings.py
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: CakeHunt-Mac
+          path: dist/CakeHunt
