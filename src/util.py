@@ -2066,7 +2066,7 @@ def launch_maxbot(script_name="nodriver_tixcraft", filename="", homepage="", kkt
     if hasattr(sys, 'frozen'):
         print("execute in frozen mode")
         # check platform here.
-        cmd = './' + script_name + ' '.join(cmd_argument)
+        cmd = './' + script_name + ' ' + ' '.join(cmd_argument)
         if platform.system() == 'Darwin':
             print("execute MacOS python script")
         if platform.system() == 'Linux':

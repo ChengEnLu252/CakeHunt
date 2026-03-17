@@ -43,7 +43,12 @@ except Exception as exc:
     print("[WARNING] OCR captcha auto-solve will be disabled.")
 
 # Get script directory for resource paths
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+#SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+# 改後
+if hasattr(sys, '_MEIPASS'):
+    SCRIPT_DIR = sys._MEIPASS
+else:
+    SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 CONST_APP_VERSION = "TicketsHunter (2026.03.14)"
 
