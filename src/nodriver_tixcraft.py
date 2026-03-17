@@ -22,8 +22,20 @@ from datetime import datetime
 # 適用於所有輸出環境（終端、IDE、重定向、管道）
 if sys.platform == 'win32':
     import io
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace', line_buffering=True)
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace', line_buffering=True)
+    if sys.stdout and hasattr(sys.stdout, 'buffer'):
+        sys.stdout = io.TextIOWrapper(
+            sys.stdout.buffer,
+            encoding='utf-8',
+            errors='replace',
+            line_buffering=True
+        )
+    if sys.stderr and hasattr(sys.stderr, 'buffer'):
+        sys.stderr = io.TextIOWrapper(
+            sys.stderr.buffer,
+            encoding='utf-8',
+            errors='replace',
+            line_buffering=True
+        )
 
 import zendriver as uc
 from zendriver import cdp
