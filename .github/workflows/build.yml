@@ -14,21 +14,18 @@ jobs:
         with:
           python-version: "3.11"
       - name: Install dependencies
-        run: |
-          pip install pyinstaller
-          pip install -r requirement.txt
-      - name: Build exe
-        run: |
-          pyinstaller --onefile --noconsole `
-            --add-data "src/www;www" `
-            --add-data "src/assets;assets" `
-            --name "CakeHunt" `
-            src/settings.py
+        run: pip install pyinstaller -r requirement.txt
+      - name: Build CakeHunt
+        run: pyinstaller --onefile --noconsole --add-data "src/www;www" --add-data "src/assets;assets" --name "CakeHunt" src/settings.py
+      - name: Build nodriver_tixcraft
+        run: pyinstaller --onefile --noconsole --add-data "src/assets;assets" --name "nodriver_tixcraft" src/nodriver_tixcraft.py
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
           name: CakeHunt-Windows
-          path: dist/CakeHunt.exe
+          path: |
+            dist/CakeHunt.exe
+            dist/nodriver_tixcraft.exe
 
   build-mac:
     runs-on: macos-latest
@@ -38,18 +35,15 @@ jobs:
         with:
           python-version: "3.11"
       - name: Install dependencies
-        run: |
-          pip install pyinstaller
-          pip install -r requirement.txt
-      - name: Build app
-        run: |
-          pyinstaller --onefile --windowed \
-            --add-data "src/www:www" \
-            --add-data "src/assets:assets" \
-            --name "CakeHunt" \
-            src/settings.py
+        run: pip install pyinstaller -r requirement.txt
+      - name: Build CakeHunt
+        run: pyinstaller --onefile --windowed --add-data "src/www:www" --add-data "src/assets:assets" --name "CakeHunt" src/settings.py
+      - name: Build nodriver_tixcraft
+        run: pyinstaller --onefile --windowed --add-data "src/assets:assets" --name "nodriver_tixcraft" src/nodriver_tixcraft.py
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
           name: CakeHunt-Mac
-          path: dist/CakeHunt
+          path: |
+            dist/CakeHunt
+            dist/nodriver_tixcraft
