@@ -514,7 +514,8 @@ async def main(args):
         # Failed to connect to browser
         # One of the causes could be when you are running as root.
         # In that case you need to pass no_sandbox=True
-        driver = await uc.start(conf, sandbox=sandbox, headless=config_dict["advanced"]["headless"])
+        driver = await uc.start(conf, no_sandbox=True, headless=config_dict["advanced"]["headless"])
+        #driver = await uc.start(conf, sandbox=sandbox, headless=config_dict["advanced"]["headless"])
         #driver = await uc.start(conf)
         if not driver is None:
             # Output actual CDP port for MCP connection (when mcp_debug is requested)
