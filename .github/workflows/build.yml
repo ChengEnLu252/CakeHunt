@@ -14,9 +14,9 @@ jobs:
       - name: Install dependencies
         run: pip install pyinstaller && pip install -r requirement.txt
       - name: Build CakeHunt
-        run: pyinstaller --onefile --noconsole --add-data "src/www;www" --add-data "src/assets;assets" --add-data "src/multi_account_manager.py;." --hidden-import tornado.websocket --hidden-import ddddocr --name "CakeHunt" src/settings.py
+        run: pyinstaller --onefile --noconsole --add-data "src/www;www" --add-data "src/assets;assets" --hidden-import tornado.websocket --hidden-import ddddocr --hidden-import multi_account_manager --paths src --name "CakeHunt" src/settings.py
       - name: Build nodriver_tixcraft
-        run: pyinstaller --onefile --noconsole --add-data "src/assets;assets" --add-data "src/platforms;platforms" --hidden-import ddddocr --name "nodriver_tixcraft" src/nodriver_tixcraft.py
+        run: pyinstaller --onefile --noconsole --add-data "src/assets;assets" --add-data "src/platforms;platforms" --hidden-import ddddocr --hidden-import multi_account_manager --paths src --name "nodriver_tixcraft" src/nodriver_tixcraft.py
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
@@ -36,9 +36,9 @@ jobs:
       - name: Install dependencies
         run: pip install pyinstaller && pip install -r requirement.txt
       - name: Build CakeHunt
-        run: pyinstaller --onedir --windowed --add-data "src/www:www" --add-data "src/assets:assets" --add-data "src/multi_account_manager.py:." --hidden-import tornado.websocket --hidden-import ddddocr --name "CakeHunt" src/settings.py
+        run: pyinstaller --onedir --windowed --add-data "src/www:www" --add-data "src/assets:assets" --hidden-import tornado.websocket --hidden-import ddddocr --hidden-import multi_account_manager --paths src --name "CakeHunt" src/settings.py
       - name: Build nodriver_tixcraft
-        run: pyinstaller --onedir --windowed --add-data "src/assets:assets" --add-data "src/platforms:platforms" --hidden-import ddddocr --name "nodriver_tixcraft" src/nodriver_tixcraft.py
+        run: pyinstaller --onedir --windowed --add-data "src/assets:assets" --add-data "src/platforms:platforms" --hidden-import ddddocr --hidden-import multi_account_manager --paths src --name "nodriver_tixcraft" src/nodriver_tixcraft.py
       - name: Zip Mac output
         run: |
           cd dist
