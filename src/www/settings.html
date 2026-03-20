@@ -1239,6 +1239,25 @@ h2::after {
   };
 
   function maAddAccount() {
+      // 先把目前已填的資料存回 maConfigList
+      var rows = document.querySelectorAll('#ma-accounts-list [data-ma-idx]');
+      rows.forEach(function(row, idx) {
+          if (!window.maConfigList[idx]) return;
+          var platform = row.querySelector('.ma-row-platform') ? row.querySelector('.ma-row-platform').value : 'kktix';
+          var account  = row.querySelector('.ma-row-account')  ? row.querySelector('.ma-row-account').value.trim()  : '';
+          var password = row.querySelector('.ma-row-password') ? row.querySelector('.ma-row-password').value.trim() : '';
+          var ao = {};
+          if (account)  ao[platform + '_account']  = account;
+          if (password) ao[platform + '_password'] = password;
+          window.maConfigList[idx].platform      = platform;
+          window.maConfigList[idx].name          = account || ('帳號 ' + (idx + 1));
+          window.maConfigList[idx].homepage      = row.querySelector('.ma-row-homepage') ? row.querySelector('.ma-row-homepage').value.trim() : '';
+          window.maConfigList[idx].ticket_number = parseInt(row.querySelector('.ma-row-ticket-number') ? row.querySelector('.ma-row-ticket-number').value : 2) || 2;
+          window.maConfigList[idx].date_keyword  = row.querySelector('.ma-row-date-keyword') ? row.querySelector('.ma-row-date-keyword').value.trim() : '';
+          window.maConfigList[idx].area_keyword  = row.querySelector('.ma-row-area-keyword') ? row.querySelector('.ma-row-area-keyword').value.trim() : '';
+          window.maConfigList[idx].accounts_override = ao;
+      });
+
       window.maConfigList.push({
           id: 'acc_' + Math.random().toString(36).slice(2, 8),
           name: '',
@@ -1325,11 +1344,42 @@ h2::after {
       var startAllBtn = document.getElementById('ma-start-all-btn');
       if (startAllBtn) {
           startAllBtn.addEventListener('click', function() {
-              fetch('/multi_accounts/bulk?action=start_all', {method:'POST'})
-                  .then(function(r) { return r.json(); })
-                  .then(function(d) {
-                      if (!d.success) alert(d.message);
+              // 先存檔，等存完再啟動
+              var rows = document.querySelectorAll('#ma-accounts-list [data-ma-idx]');
+              var result = [];
+              rows.forEach(function(row, idx) {
+                  var platform = row.querySelector('.ma-row-platform') ? row.querySelector('.ma-row-platform').value : 'kktix';
+                  var account  = row.querySelector('.ma-row-account')  ? row.querySelector('.ma-row-account').value.trim()  : '';
+                  var password = row.querySelector('.ma-row-password') ? row.querySelector('.ma-row-password').value.trim() : '';
+                  var ao = {};
+                  if (account)  ao[platform + '_account']  = account;
+                  if (password) ao[platform + '_password'] = password;
+                  result.push({
+                      id:            row.querySelector('.ma-row-id') ? row.querySelector('.ma-row-id').value : ('acc_' + idx),
+                      name:          account || ('帳號 ' + (idx + 1)),
+                      platform:      platform,
+                      homepage:      row.querySelector('.ma-row-homepage') ? row.querySelector('.ma-row-homepage').value.trim() : '',
+                      ticket_number: parseInt(row.querySelector('.ma-row-ticket-number') ? row.querySelector('.ma-row-ticket-number').value : 2) || 2,
+                      date_keyword:  row.querySelector('.ma-row-date-keyword') ? row.querySelector('.ma-row-date-keyword').value.trim() : '',
+                      area_keyword:  row.querySelector('.ma-row-area-keyword') ? row.querySelector('.ma-row-area-keyword').value.trim() : '',
+                      accounts_override: ao
                   });
+              });
+              if (result.length === 0) {
+                  alert('請先在「自動填表單」頁面新增帳號');
+                  return;
+              }
+              fetch('/multi_accounts/config', {
+                  method: 'POST',
+                  headers: {'Content-Type': 'application/json'},
+                  body: JSON.stringify({multi_accounts: result})
+              }).then(function() {
+                  return fetch('/multi_accounts/bulk?action=start_all', {method:'POST'});
+              }).then(function(r) {
+                  return r.json();
+              }).then(function(d) {
+                  if (!d.success) alert(d.message);
+              });
           });
       }
 

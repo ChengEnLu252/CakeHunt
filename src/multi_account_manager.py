@@ -224,8 +224,22 @@ class MultiAccountManager:
             env = _copy.copy(os.environ)
             env["PYTHONUNBUFFERED"] = "1"
 
+            import sys as _sys
+            if getattr(_sys, 'frozen', False):
+                # 打包後：找同目錄的 nodriver_tixcraft 執行檔
+                import os as _os
+                _exe_dir = _os.path.dirname(_sys.executable)
+                if _sys.platform == 'win32':
+                    _bot_exe = _os.path.join(_exe_dir, 'nodriver_tixcraft.exe')
+                else:
+                    _bot_exe = _os.path.join(_exe_dir, 'nodriver_tixcraft')
+                _cmd = [_bot_exe, "--input", config_path]
+            else:
+                # 開發模式：用 Python 執行 .py
+                _cmd = [_sys.executable, "-u", self._bot_script, "--input", config_path]
+
             proc = subprocess.Popen(
-                [sys.executable, "-u", self._bot_script, "--input", config_path],
+                _cmd,
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                 text=True, encoding="utf-8", errors="replace", bufsize=1,
                 env=env,

@@ -1,10 +1,8 @@
 name: Build CakeHunt
-
 on:
   push:
     tags:
       - "v*"
-
 jobs:
   build-windows:
     runs-on: windows-latest
@@ -14,15 +12,16 @@ jobs:
         with:
           python-version: "3.11"
       - name: Install dependencies
-        run: pip install pyinstaller -r requirement.txt
+        run: pip install pyinstaller && pip install -r requirement.txt
       - name: Build CakeHunt
-        run: pyinstaller --onefile --noconsole --add-data "src/www;www" --add-data "src/assets;assets" --name "CakeHunt" src/settings.py
+        run: pyinstaller --onefile --noconsole --add-data "src/www;www" --add-data "src/assets;assets" --add-data "src/multi_account_manager.py;." --hidden-import tornado.websocket --hidden-import ddddocr --name "CakeHunt" src/settings.py
       - name: Build nodriver_tixcraft
-        run: pyinstaller --onefile --noconsole --add-data "src/assets;assets" --name "nodriver_tixcraft" src/nodriver_tixcraft.py
+        run: pyinstaller --onefile --noconsole --add-data "src/assets;assets" --add-data "src/platforms;platforms" --hidden-import ddddocr --name "nodriver_tixcraft" src/nodriver_tixcraft.py
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
           name: CakeHunt-Windows
+          compression-level: 0
           path: |
             dist/CakeHunt.exe
             dist/nodriver_tixcraft.exe
@@ -35,15 +34,18 @@ jobs:
         with:
           python-version: "3.11"
       - name: Install dependencies
-        run: pip install pyinstaller -r requirement.txt
+        run: pip install pyinstaller && pip install -r requirement.txt
       - name: Build CakeHunt
-        run: pyinstaller --onefile --windowed --add-data "src/www:www" --add-data "src/assets:assets" --name "CakeHunt" src/settings.py
+        run: pyinstaller --onedir --windowed --add-data "src/www:www" --add-data "src/assets:assets" --add-data "src/multi_account_manager.py:." --hidden-import tornado.websocket --hidden-import ddddocr --name "CakeHunt" src/settings.py
       - name: Build nodriver_tixcraft
-        run: pyinstaller --onefile --windowed --add-data "src/assets:assets" --name "nodriver_tixcraft" src/nodriver_tixcraft.py
+        run: pyinstaller --onedir --windowed --add-data "src/assets:assets" --add-data "src/platforms:platforms" --hidden-import ddddocr --name "nodriver_tixcraft" src/nodriver_tixcraft.py
+      - name: Zip Mac output
+        run: |
+          cd dist
+          zip -r CakeHunt-Mac.zip CakeHunt nodriver_tixcraft
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
           name: CakeHunt-Mac
-          path: |
-            dist/CakeHunt
-            dist/nodriver_tixcraft
+          compression-level: 0
+          path: dist/CakeHunt-Mac.zip
