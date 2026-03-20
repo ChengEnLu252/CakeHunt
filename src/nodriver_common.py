@@ -858,6 +858,8 @@ def get_nodriver_browser_args():
         "--password-store=basic",
         # Note: --remote-debugging-host is managed by Config(host=...) when MCP debug is enabled
         "--lang=zh-TW",
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
     ]
 
     # Expert mode: cautiously add high-risk args

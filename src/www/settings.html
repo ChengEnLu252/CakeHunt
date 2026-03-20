@@ -10,9 +10,7 @@
   <script src="dist/bootstrap/bootstrap.min.js"></script>
   <script src="dist/jquery.min.js"></script>
   <link rel="stylesheet" type="text/css" href="css/settings.css" />
-  <link rel="icon" href="/favicon-32x32.png" sizes="32x32" type="image/png">
-  <link rel="icon" href="/favicon-16x16.png" sizes="16x16" type="image/png">
-  <link rel="icon" href="/favicon.ico">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎂</text></svg>">
   <style>
 /* =============================
    💕 粉紅可愛主題 - 完整版
@@ -243,7 +241,7 @@ h2::after {
       </li>
 
       <li class="nav-item" role="presentation">
-        <button class="nav-link" id="runtime-tab" data-bs-toggle="tab" data-bs-target="#runtime-tab-pane" type="button" role="tab" aria-controls="runtime-tab-pane" aria-selected="false">執行階段</button>
+          <button class="nav-link" id="runtime-tab" data-bs-toggle="tab" data-bs-target="#runtime-tab-pane" type="button" role="tab" aria-controls="runtime-tab-pane" aria-selected="false">🎯 搶票監控</button>
       </li>
 
       <li class="nav-item ms-3 d-flex align-items-center" role="presentation">
@@ -853,6 +851,10 @@ h2::after {
 
         <hr class="mb-4"/>
 
+        <div class="alert alert-info mb-3" style="font-size:0.85rem;">
+          <strong>🎫 單一帳號搶票：</strong>直接在下方填入帳號密碼，按底部「單一帳號搶票」即可。
+        </div>
+
         <!-- 平台帳號區塊 -->
         <div class="row mb-3" data-under="tixcraft">
           <label for="tixcraft_sid" class="col-sm-2 col-form-label">拓元家族 cookie (TIXUISID / IVUISID / TIXPUISID)<span class="help-icon" data-help="tixcraft_sid" title="拓元家族 Cookie 說明" tabindex="0" role="button" aria-label="拓元家族 Cookie 說明"></span></label>
@@ -1057,111 +1059,92 @@ h2::after {
           </div>
         </div>
 
+        <!-- ── 多帳號搶票設定 ────────────────────────────── -->
+        <div class="row mb-2 mt-4">
+          <div class="col-12">
+            <hr>
+            <h6 class="mb-0">🎯 多帳號搶票設定</h6>
+            <div class="alert alert-warning mt-2 mb-2" style="font-size:0.85rem;">
+              <strong>⚠️ 注意：</strong>若需要多帳號同時搶票，請在下方分別填入每一組帳號密碼，<strong>請勿</strong>將第二組帳號直接填入上方單一帳號欄位。填完後按底部「多帳號搶票」啟動。
+            </div>
+            <p class="text-muted mb-3" style="font-size:0.82rem;">
+              每個帳號將各自開啟一個瀏覽器同時搶票，帳號密碼留空則沿用上方全域設定
+            </p>
+          </div>
+        </div>
+
+        <!-- 帳號列動態區 -->
+        <div id="ma-accounts-list" class="mb-3">
+          <!-- 由 JS 動態渲染 -->
+        </div>
+
+        <div class="row mb-3">
+          <div class="col-12">
+            <button type="button" class="btn btn-outline-primary" onclick="maAddAccount()">＋ 新增帳號</button>
+        </div>
       </div>
 
-      <!-- tab 6 -->
-      <div class="tab-pane fade" id="runtime-tab-pane" role="tabpanel" aria-labelledby="runtime-tab" tabindex="2">
-        <div class="row mb-3">
-          <label class="col-sm-2 col-form-label">執行狀態</label>
-          <div class="col-sm-10 col-lg-8 col-xl-6">
-            <span id="maxbot_status"></span>
-            <button class="btn btn-primary" id="pause_btn">暫停搶票</button>
-            <button class="btn btn-primary" id="resume_btn">繼續搶票</button>
+    </div>
+
+      <!-- tab 6＆7搶票監控 -->
+      <div class="tab-pane fade" id="runtime-tab-pane" role="tabpanel" aria-labelledby="runtime-tab" tabindex="0">
+
+        <div class="row mb-3 align-items-center">
+          <div class="col-auto">
+            <span class="text-muted" style="font-size:0.85rem;">🕐 系統時間：</span>
+            <span id="system_time" style="font-size:0.85rem;font-family:monospace;"></span>
+          </div>
+          <div class="col-auto ms-auto">
+            <span id="ma-ws-status" style="font-size:0.8rem;color:#aaa;">⚪ 未連線</span>
           </div>
         </div>
 
-        <div class="row mb-3">
-          <label for="last_url" class="col-sm-2 col-form-label">執行網址</label>
-          <div class="col-sm-10 col-lg-8 col-xl-6">
-            <p class="form-control-plaintext" id="last_url"></p>
+        <div class="row mb-4">
+          <div class="col-12 d-flex gap-2 flex-wrap align-items-center">
+            <small class="text-muted" style="font-size:0.8rem;">帳號設定請至「自動填表單」頁籤後，至底部按「多帳號搶票」啟動</small>
           </div>
         </div>
 
-        <div class="row mb-3">
-          <label class="col-sm-2 col-form-label">系統時間</label>
-          <div class="col-sm-10 col-lg-8 col-xl-6">
-            <span id="system_time"></span>
+        <div id="ma-cards-container" class="row g-3">
+          <div class="col-12 text-center text-muted py-5" id="ma-empty-state">
+            <p class="mb-2" style="font-size:2rem;">🎂</p>
+            <p>尚未有搶票實例</p>
+            <p style="font-size:0.8rem;">請至「自動填表單」新增帳號後點「▶ 全部啟動」</p>
           </div>
         </div>
 
-        <div class="row mb-3">
-          <label for="idle_keyword" class="col-sm-2 col-form-label">系統時間 - <span class="text-danger">暫停</span>關鍵字<span class="help-icon" data-help="idle_keyword" title="系統時間暫停關鍵字說明" tabindex="0" role="button" aria-label="系統時間暫停關鍵字 說明"></span></label>
-          <div class="col-sm-10 col-lg-8 col-xl-6">
-            <input type="text" class="form-control" id="idle_keyword" placeholder="例如：09:30:00;14:15:30">
-          </div>
-        </div>
-
-        <div class="row mb-3">
-          <label for="resume_keyword" class="col-sm-2 col-form-label">系統時間 - <span class="text-success">繼續</span>關鍵字<span class="help-icon" data-help="resume_keyword" title="系統時間繼續關鍵字說明" tabindex="0" role="button" aria-label="系統時間繼續關鍵字 說明"></span></label>
-          <div class="col-sm-10 col-lg-8 col-xl-6">
-            <input type="text" class="form-control" id="resume_keyword" placeholder="例如：09:35:00;14:20:30">
-          </div>
-        </div>
-
-        <div class="row mb-3">
-          <label for="idle_keyword_second" class="col-sm-2 col-form-label">秒數 - <span class="text-danger">暫停</span>關鍵字<span class="help-icon" data-help="idle_keyword_second" title="秒數暫停關鍵字說明" tabindex="0" role="button" aria-label="秒數暫停關鍵字 說明"></span></label>
-          <div class="col-sm-10 col-lg-8 col-xl-6">
-            <input type="text" class="form-control" id="idle_keyword_second" placeholder="例如：00;30;50">
-          </div>
-        </div>
-
-        <div class="row mb-3">
-          <label for="resume_keyword_second" class="col-sm-2 col-form-label">秒數 - <span class="text-success">繼續</span>關鍵字<span class="help-icon" data-help="resume_keyword_second" title="秒數繼續關鍵字說明" tabindex="0" role="button" aria-label="秒數繼續關鍵字 說明"></span></label>
-          <div class="col-sm-10 col-lg-8 col-xl-6">
-            <input type="text" class="form-control" id="resume_keyword_second" placeholder="例如：05;35;55">
-          </div>
-        </div>
-
-        <div class="row mb-3">
-          <div class="col-sm-12">
+        <div class="row mt-4">
+          <div class="col-12">
             <div class="accordion" id="accordionRuntimeHelp">
               <div class="accordion-item">
                 <h2 class="accordion-header">
-                  <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseRuntimeHelp" aria-expanded="false" aria-controls="collapseRuntimeHelp">
+                  <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseRuntimeHelp" aria-expanded="false">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-clock me-2" viewBox="0 0 16 16"><path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71z"/><path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16m7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0"/></svg>
-                    時間控制功能說明
+                    進階：時間自動暫停／繼續設定
                   </button>
                 </h2>
                 <div id="collapseRuntimeHelp" class="accordion-collapse collapse">
                   <div class="accordion-body">
-                    <strong>功能說明：</strong>
-                    <ul class="mb-3">
-                      <li><strong>系統時間關鍵字：</strong>使用 <code>HH:MM:SS</code> 格式（時:分:秒）</li>
-                      <li><strong>秒數關鍵字：</strong>只使用秒數 <code>SS</code> 格式（每分鐘的指定秒數觸發）</li>
-                      <li><strong>暫停功能：</strong>當系統時間符合暫停關鍵字時，自動暫停搶票動作</li>
-                      <li><strong>繼續功能：</strong>當系統時間符合繼續關鍵字時，自動恢復搶票動作</li>
-                    </ul>
-
-                    <div class="alert alert-success mb-3">
-                      <strong>📝 輸入格式範例：</strong>
-                      <div class="row">
-                        <div class="col-md-6">
-                          <strong>系統時間：</strong>
-                          <ul class="mb-1">
-                            <li><code>09:30:00;15:55:00</code></li>
-                            <li><code>"09:30:00";"15:55:00"</code></li>
-                            <li><code>14:30:00</code> (單一時間)</li>
-                          </ul>
-                        </div>
-                        <div class="col-md-6">
-                          <strong>秒數：</strong>
-                          <ul class="mb-1">
-                            <li><code>00;30;50</code></li>
-                            <li><code>"00";"30";"50"</code></li>
-                            <li><code>30</code> (單一秒數)</li>
-                          </ul>
-                        </div>
+                    <div class="row g-3">
+                      <div class="col-md-6">
+                        <label class="form-label">系統時間 - <span class="text-danger">暫停</span>關鍵字<span class="help-icon" data-help="idle_keyword" tabindex="0" role="button"></span></label>
+                        <input type="text" class="form-control" id="idle_keyword" placeholder="例如：09:30:00;14:15:30">
+                      </div>
+                      <div class="col-md-6">
+                        <label class="form-label">系統時間 - <span class="text-success">繼續</span>關鍵字<span class="help-icon" data-help="resume_keyword" tabindex="0" role="button"></span></label>
+                        <input type="text" class="form-control" id="resume_keyword" placeholder="例如：09:35:00;14:20:30">
+                      </div>
+                      <div class="col-md-6">
+                        <label class="form-label">秒數 - <span class="text-danger">暫停</span>關鍵字<span class="help-icon" data-help="idle_keyword_second" tabindex="0" role="button"></span></label>
+                        <input type="text" class="form-control" id="idle_keyword_second" placeholder="例如：00;30;50">
+                      </div>
+                      <div class="col-md-6">
+                        <label class="form-label">秒數 - <span class="text-success">繼續</span>關鍵字<span class="help-icon" data-help="resume_keyword_second" tabindex="0" role="button"></span></label>
+                        <input type="text" class="form-control" id="resume_keyword_second" placeholder="例如：05;35;55">
                       </div>
                     </div>
-
-                    <div class="alert alert-warning mb-0">
-                      <strong>注意事項：</strong>
-                      <ul class="mb-0">
-                        <li>時間格式必須精確，格式錯誤會導致功能失效</li>
-                        <li>程式會持續檢查系統時間，匹配到設定時間會立即執行對應動作</li>
-                        <li>建議搭配暫停與繼續關鍵字使用，避免程式一直處於暫停狀態</li>
-                        <li>秒數關鍵字會在每分鐘的指定秒數觸發，適合做週期性控制</li>
-                      </ul>
+                    <div class="alert alert-info mt-3 mb-0" style="font-size:0.85rem;">
+                      <strong>說明：</strong>設定指定時間自動暫停或繼續搶票。系統時間格式 <code>HH:MM:SS</code>；秒數格式只填秒數 <code>SS</code>（每分鐘觸發）。多個時間用 <code>;</code> 分隔。
                     </div>
                   </div>
                 </div>
@@ -1171,11 +1154,13 @@ h2::after {
         </div>
 
       </div>
+      <!-- end tab 搶票監控 -->
 
-    </div>
+    </div><!-- end tab-content -->
     <hr/>
     <div class="col-12">
-      <button class="btn btn-primary" id="run_btn">搶票</button>
+      <button class="btn btn-primary" id="run_btn">單一帳號搶票按此開始</button>
+      <button class="btn btn-primary" id="ma-start-all-btn">多帳號搶票按此開始</button>
       <button class="btn btn-primary" id="save_btn">存檔</button>
       <button class="btn btn-primary" id="reset_btn">重設為預設值</button>
       <button class="btn btn-danger" id="exit_btn">結束</button>
@@ -1183,25 +1168,8 @@ h2::after {
     <div class="col-12">
       <span class="text-danger" id="run_btn_pressed_message"></span>
     </div>
-  </div>
-  </div>
-
-<div class="modal" id="message_modal" tabindex="-1" role="dialog">
-  <div class="modal-dialog" role="document">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2 class="modal-title fs-5" id="message_modal_title">Tickets Hunter</h2>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        <p id="message_detail"></p>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">關閉</button>
-      </div>
-    </div>
-  </div>
-</div>
+  </div><!-- end row g-3 -->
+  </div><!-- end container -->
 
 <!-- Help Panel -->
 <div class="offcanvas offcanvas-end" tabindex="-1" id="helpPanel"
@@ -1219,6 +1187,262 @@ h2::after {
 </div>
 
   <script src="help-content.js?v=2026031001"></script>
-  <script src="settings.js?v=2026031402"></script>
+  <script src="settings.js?v=2026032099"></script>
+  <script>
+  window.maConfigList = [];
+
+  window.maRenderConfigList = function() {
+      var container = document.getElementById('ma-accounts-list');
+      if (!container) return;
+      if (window.maConfigList.length === 0) {
+          container.innerHTML = '';
+          return;
+      }
+      container.innerHTML = window.maConfigList.map(function(entry, idx) {
+          var ao = entry.accounts_override || {};
+          var platform = entry.platform || 'kktix';
+          var platKey = platform + '_account';
+          var passKey = platform + '_password';
+          var platforms = ['kktix','tixcraft','famiticket','ibon','ticketplus','kham','cityline','hkticketing'];
+          var options = platforms.map(function(p) {
+              return '<option value="' + p + '"' + (platform === p ? ' selected' : '') + '>' + p + '</option>';
+          }).join('');
+          return '<div class="row mb-3" id="ma-row-card-' + idx + '" data-ma-idx="' + idx + '">'
+              + '<input type="hidden" class="ma-row-id" value="' + (entry.id || '') + '">'
+              + '<label class="col-sm-2 col-form-label">'
+              + '<select class="form-select form-select-sm ma-row-platform" style="max-width:120px;">' + options + '</select>'
+              + '</label>'
+              + '<div class="col-sm-10 col-lg-8 col-xl-6">'
+              + '<div class="input-group mb-2">'
+              + '<span class="input-group-text">帳號</span>'
+              + '<input type="text" class="form-control ma-row-account" placeholder="輸入下一組帳號" value="' + (ao[platKey] || '') + '">'
+              + '<span class="input-group-text">密碼</span>'
+              + '<input type="password" class="form-control ma-row-password" placeholder="輸入下一組密碼" value="' + (ao[passKey] || '') + '">'
+              + '<button type="button" class="btn btn-outline-danger" onclick="maDeleteRow(' + idx + ')">✕</button>'
+              + '</div>'
+              + '<div class="input-group">'
+              + '<span class="input-group-text">目標網址</span>'
+              + '<input type="text" class="form-control ma-row-homepage" placeholder="https://kktix.com/events/..." value="' + (entry.homepage || '') + '">'
+              + '</div>'
+              + '<div class="row g-2 mt-1">'
+              + '<div class="col-auto"><div class="input-group input-group-sm"><span class="input-group-text">張數</span><input type="number" class="form-control ma-row-ticket-number" style="max-width:60px;" min="1" max="10" value="' + (entry.ticket_number || 2) + '"></div></div>'
+              + '<div class="col"><input type="text" class="form-control form-control-sm ma-row-date-keyword" placeholder="場次關鍵字（; 分隔）" value="' + (entry.date_keyword || '') + '"></div>'
+              + '<div class="col"><input type="text" class="form-control form-control-sm ma-row-area-keyword" placeholder="區域關鍵字（; 分隔）" value="' + (entry.area_keyword || '') + '"></div>'
+              + '</div>'
+              + '</div></div>';
+      }).join('');
+  };
+
+  window.maDeleteRow = function(idx) {
+      window.maConfigList.splice(idx, 1);
+      window.maRenderConfigList();
+  };
+
+  function maAddAccount() {
+      window.maConfigList.push({
+          id: 'acc_' + Math.random().toString(36).slice(2, 8),
+          name: '',
+          platform: (function(){
+              var url = document.getElementById('homepage')?.value || '';
+              var map = [
+                  ['kktix',['kktix.com','kktix.cc']],
+                  ['tixcraft',['tixcraft.com','teamear.com','indievox.com','ticketmaster.']],
+                  ['famiticket',['famiticket.com']],
+                  ['ibon',['ibon.com']],
+                  ['ticketplus',['ticketplus.com']],
+                  ['kham',['kham.com.tw']],
+                  ['cityline',['cityline.com']],
+                  ['hkticketing',['hkticketing.com','galaxymacau.com','ticketek.com']]
+              ];
+              for(var i=0;i<map.length;i++){
+                  for(var j=0;j<map[i][1].length;j++){
+                      if(url.includes(map[i][1][j])) return map[i][0];
+                  }
+              }
+              return 'kktix';
+          })(),
+          homepage: document.getElementById('homepage')?.value || '',
+          ticket_number: 2,
+          date_keyword: '',
+          area_keyword: '',
+          accounts_override: {}
+      });
+      window.maRenderConfigList();
+      var list = document.getElementById('ma-accounts-list');
+      if (list && list.lastElementChild) {
+          list.lastElementChild.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+
+      // 載入已儲存帳號
+      fetch('/multi_accounts/config')
+          .then(function(r) { return r.json(); })
+          .then(function(data) {
+              var list = data.multi_accounts || [];
+              window.maConfigList.length = 0;
+              list.forEach(function(item) { window.maConfigList.push(item); });
+              window.maRenderConfigList();
+          })
+          .catch(function(e) { console.warn('無法載入多帳號設定', e); });
+
+      // 存檔按鈕：同時儲存多帳號
+      var saveBtn = document.getElementById('save_btn');
+      if (saveBtn) {
+          saveBtn.addEventListener('click', function() {
+              var rows = document.querySelectorAll('#ma-accounts-list [data-ma-idx]');
+              var result = [];
+              rows.forEach(function(row, idx) {
+                  var platform = row.querySelector('.ma-row-platform') ? row.querySelector('.ma-row-platform').value : 'kktix';
+                  var account  = row.querySelector('.ma-row-account')  ? row.querySelector('.ma-row-account').value.trim()  : '';
+                  var password = row.querySelector('.ma-row-password') ? row.querySelector('.ma-row-password').value.trim() : '';
+                  var ao = {};
+                  if (account)  ao[platform + '_account']  = account;
+                  if (password) ao[platform + '_password'] = password;
+                  result.push({
+                      id:            row.querySelector('.ma-row-id') ? row.querySelector('.ma-row-id').value : ('acc_' + idx),
+                      name:          account || ('帳號 ' + (idx + 1)),
+                      platform:      platform,
+                      homepage:      row.querySelector('.ma-row-homepage') ? row.querySelector('.ma-row-homepage').value.trim() : '',
+                      ticket_number: parseInt(row.querySelector('.ma-row-ticket-number') ? row.querySelector('.ma-row-ticket-number').value : 2) || 2,
+                      date_keyword:  row.querySelector('.ma-row-date-keyword') ? row.querySelector('.ma-row-date-keyword').value.trim() : '',
+                      area_keyword:  row.querySelector('.ma-row-area-keyword') ? row.querySelector('.ma-row-area-keyword').value.trim() : '',
+                      accounts_override: ao
+                  });
+              });
+              fetch('/multi_accounts/config', {
+                  method: 'POST',
+                  headers: {'Content-Type': 'application/json'},
+                  body: JSON.stringify({multi_accounts: result})
+              }).then(function() {
+                  console.log('[MultiAccount] 已儲存 ' + result.length + ' 個帳號');
+              });
+          }, true);
+      }
+
+      // 全部啟動
+      var startAllBtn = document.getElementById('ma-start-all-btn');
+      if (startAllBtn) {
+          startAllBtn.addEventListener('click', function() {
+              fetch('/multi_accounts/bulk?action=start_all', {method:'POST'})
+                  .then(function(r) { return r.json(); })
+                  .then(function(d) {
+                      if (!d.success) alert(d.message);
+                  });
+          });
+      }
+
+      // 全部停止
+      var stopAllBtn = document.getElementById('ma-stop-all-btn');
+      if (stopAllBtn) {
+          stopAllBtn.addEventListener('click', function() {
+              fetch('/multi_accounts/bulk?action=stop_all', {method:'POST'});
+          });
+      }
+
+      // 暫停
+      var pauseBtn = document.getElementById('pause_btn');
+      if (pauseBtn) {
+          pauseBtn.addEventListener('click', function() {
+              fetch('/pause', {method:'POST'});
+          });
+      }
+
+      // 繼續
+      var resumeBtn = document.getElementById('resume_btn');
+      if (resumeBtn) {
+          resumeBtn.addEventListener('click', function() {
+              fetch('/resume', {method:'POST'});
+          });
+      }
+
+      // WebSocket 連線
+      function maConnectWS() {
+          var port = window.location.port || 16888;
+          var ws = new WebSocket('ws://127.0.0.1:' + port + '/ws/multi');
+          ws.onopen = function() {
+              var label = document.getElementById('ma-ws-status');
+              if (label) label.textContent = '🟢 已連線';
+          };
+          ws.onmessage = function(e) {
+              try {
+                  var data = JSON.parse(e.data);
+                  var accounts = [];
+                  if (data.type === 'init') accounts = data.accounts || [];
+                  else if (data.type === 'status_update') accounts = [data.account];
+                  else if (data.type === 'account_removed') {
+                      var el = document.getElementById('ma-card-' + data.account_id);
+                      if (el) el.remove();
+                      return;
+                  }
+                  accounts.forEach(function(acc) {
+                      var containerId = 'ma-card-' + acc.account_id;
+                      var card = document.getElementById(containerId);
+                      var colorMap = {idle:'secondary',starting:'primary',running:'primary',selecting:'info',captcha:'warning',cloudflare:'warning',ordering:'info',success:'success',sold_out:'warning',paused:'secondary',error:'danger',stopped:'secondary'};
+                      var bsColor = colorMap[acc.status] || 'secondary';
+                      var logHtml = (acc.logs || []).slice(-15).map(function(line) {
+                          var color = '#aaa';
+                          var sl = line.toLowerCase();
+                          if (sl.indexOf('成功')>=0||sl.indexOf('success')>=0) color='#20c997';
+                          else if (sl.indexOf('[error]')>=0||sl.indexOf('traceback')>=0) color='#dc3545';
+                          else if (sl.indexOf('captcha')>=0||sl.indexOf('cloudflare')>=0) color='#ffc107';
+                          return '<div style="color:'+color+';padding:1px 0;">'+line.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</div>';
+                      }).join('');
+                      var aid = acc.account_id;
+                      var runBtn = acc.is_running
+                          ? '<button class="btn btn-sm btn-outline-primary" onclick="maStopAccount(\''+aid+'\')">■ 停止</button>'
+                          : '<button class="btn btn-sm btn-primary" onclick="maRemoveAccount(\''+aid+'\')">🗑 移除</button>';
+                      var cardHtml = '<div class="card h-100" style="border-top:3px solid;">'
+                          + '<div class="card-header d-flex align-items-center gap-2 py-2">'
+                          + '<span class="badge bg-'+bsColor+'">'+acc.status_label+'</span>'
+                          + '<strong class="flex-grow-1" style="font-size:0.9rem;">'+acc.name+'</strong>'
+                          + '<span class="text-muted" style="font-size:0.75rem;">🎫 '+acc.ticket_number+'張</span>'
+                          + '</div>'
+                          + '<div class="card-body p-2">'
+                          + '<div class="mb-2" style="font-size:0.75rem;color:var(--pink);word-break:break-all;">'+(acc.current_url||'尚未訪問任何頁面')+'</div>'
+                          + '<div style="background:#111;border-radius:6px;padding:6px 8px;height:110px;overflow-y:auto;font-family:monospace;font-size:0.72rem;line-height:1.5;">'+logHtml+'</div>'
+                          + '</div>'
+                          + '<div class="card-footer d-flex gap-2 py-2">'+runBtn+'</div>'
+                          + '</div>';
+                      if (!card) {
+                          var col = document.createElement('div');
+                          col.className = 'col-12 col-md-6 col-xl-4';
+                          col.id = containerId;
+                          col.innerHTML = cardHtml;
+                          var container = document.getElementById('ma-cards-container');
+                          if (container) container.appendChild(col);
+                          var empty = document.getElementById('ma-empty-state');
+                          if (empty) empty.style.display = 'none';
+                      } else {
+                          card.innerHTML = cardHtml;
+                      }
+                  });
+              } catch(err) {}
+          };
+          ws.onclose = function() {
+              var label = document.getElementById('ma-ws-status');
+              if (label) label.textContent = '🔴 連線中斷';
+              setTimeout(maConnectWS, 3000);
+          };
+          ws.onerror = function() {
+              var label = document.getElementById('ma-ws-status');
+              if (label) label.textContent = '🔴 連線失敗';
+          };
+      }
+      maConnectWS();
+      window.maStopAccount = function(id) {
+          fetch('/multi_accounts/control/' + id + '?action=stop', {method:'POST'})
+              .then(function(r) { return r.json(); })
+              .then(function(d) { console.log('stop result:', d); });
+      };
+
+      window.maRemoveAccount = function(id) {
+          if (!confirm('確定移除？')) return;
+          fetch('/multi_accounts/control/' + id + '?action=remove', {method:'POST'});
+      };
+
+  });
+</script>
 </body>
 </html>

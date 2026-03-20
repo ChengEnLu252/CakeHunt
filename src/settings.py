@@ -4,7 +4,6 @@ import asyncio
 import base64
 import json
 import os
-import platform
 import subprocess
 import sys
 import threading
@@ -18,6 +17,9 @@ from tornado.web import StaticFileHandler
 
 import requests
 import util
+
+import tornado.websocket
+from multi_account_manager import multi_manager, _merge_config
 
 from typing import (
     Dict,
@@ -50,7 +52,7 @@ if hasattr(sys, '_MEIPASS'):
 else:
     SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
-CONST_APP_VERSION = "TicketsHunter (2026.03.14)"
+CONST_APP_VERSION = "NN多帳號開掛版"
 
 CONST_MAXBOT_ANSWER_ONLINE_FILE = "MAXBOT_ONLINE_ANSWER.txt"
 CONST_MAXBOT_CONFIG_FILE = "settings.json"
@@ -93,13 +95,6 @@ CONST_SUPPORTED_SITES = ["https://kktix.com"
     ,"https://ticketing.galaxymacau.com/ (澳門銀河)"
     ,"http://premier.ticketek.com.au"
     ]
-
-URL_DONATE = 'https://max-everyday.com/about/#donate'
-URL_HELP = 'https://max-everyday.com/2018/03/tixcraft-bot/'
-URL_RELEASE = 'https://github.com/bouob/tickets_hunter/releases'
-URL_CHROME_DRIVER = 'https://chromedriver.chromium.org/'
-URL_FIREFOX_DRIVER = 'https://github.com/mozilla/geckodriver/releases'
-URL_EDGE_DRIVER = 'https://developer.microsoft.com/zh-tw/microsoft-edge/tools/webdriver/'
 
 
 def get_default_config():
@@ -771,6 +766,81 @@ class QueryHandler(tornado.web.RequestHandler):
         answer_text_output = self.compose_as_json(answer_text)
         #print("answer_text_output:", answer_text_output)
         self.write(answer_text_output)
+        
+# ══════════════════════════════════════════════════════════
+# Multi-Account Handlers
+# ══════════════════════════════════════════════════════════
+class MultiAccountWebSocket(tornado.websocket.WebSocketHandler):
+    def check_origin(self, origin): return True
+    def open(self):
+        multi_manager.add_ws_client(self)
+        self.write_message(json.dumps(
+            {"type": "init", "accounts": multi_manager.get_all_status()},
+            ensure_ascii=False
+        ))
+    def on_message(self, message): pass
+    def on_close(self): multi_manager.remove_ws_client(self)
+
+class MultiAccountListHandler(tornado.web.RequestHandler):
+    def set_default_headers(self):
+        self.set_header("Access-Control-Allow-Origin", "*")
+        self.set_header("Content-Type", "application/json; charset=utf-8")
+    def get(self):
+        self.write(json.dumps({"accounts": multi_manager.get_all_status()}, ensure_ascii=False))
+    def post(self):
+        try: body = json.loads(self.request.body.decode("utf-8"))
+        except: self.write(json.dumps({"success": False, "message": "JSON錯誤"})); return
+        entry = body.get("account_entry", {})
+        if not entry: self.write(json.dumps({"success": False, "message": "缺少account_entry"})); return
+        import uuid
+        aid = entry.get("id") or str(uuid.uuid4())[:8]
+        entry["id"] = aid
+        _, base_config = load_json()
+        merged = _merge_config(base_config, entry)
+        self.write(json.dumps(multi_manager.start_account(aid, entry.get("name", aid), merged), ensure_ascii=False))
+
+class MultiAccountControlHandler(tornado.web.RequestHandler):
+    def set_default_headers(self):
+        self.set_header("Access-Control-Allow-Origin", "*")
+        self.set_header("Content-Type", "application/json; charset=utf-8")
+    def post(self, account_id):
+        action = self.get_argument("action", "stop")
+        if action == "stop": result = multi_manager.stop_account(account_id)
+        elif action == "remove": result = multi_manager.remove_account(account_id)
+        else: result = {"success": False, "message": f"未知動作:{action}"}
+        self.write(json.dumps(result, ensure_ascii=False))
+
+class MultiAccountBulkHandler(tornado.web.RequestHandler):
+    def set_default_headers(self):
+        self.set_header("Access-Control-Allow-Origin", "*")
+        self.set_header("Content-Type", "application/json; charset=utf-8")
+    def post(self):
+        action = self.get_argument("action", "")
+        _, base_config = load_json()
+        if action == "start_all":
+            items = base_config.get("multi_accounts", [])
+            if not items: self.write(json.dumps({"success": False, "message": "settings.json 未設定 multi_accounts"})); return
+            self.write(json.dumps({"success": True, "results": multi_manager.start_all_from_config(items, base_config)}, ensure_ascii=False))
+        elif action == "stop_all":
+            multi_manager.stop_all()
+            self.write(json.dumps({"success": True}))
+        else:
+            self.write(json.dumps({"success": False, "message": f"未知:{action}"}))
+
+class MultiAccountConfigHandler(tornado.web.RequestHandler):
+    def set_default_headers(self):
+        self.set_header("Access-Control-Allow-Origin", "*")
+        self.set_header("Content-Type", "application/json; charset=utf-8")
+    def get(self):
+        _, config_dict = load_json()
+        self.write(json.dumps({"multi_accounts": config_dict.get("multi_accounts", [])}, ensure_ascii=False))
+    def post(self):
+        try: body = json.loads(self.request.body.decode("utf-8"))
+        except: self.write(json.dumps({"success": False, "message": "JSON錯誤"})); return
+        config_path, config_dict = load_json()
+        config_dict["multi_accounts"] = body.get("multi_accounts", [])
+        util.save_json(config_dict, config_path)
+        self.write(json.dumps({"success": True}))
 
 async def main_server():
     ocr = None
@@ -801,6 +871,11 @@ async def main_server():
         ("/ocr", OcrHandler),
         ("/query", QueryHandler),
         ("/question", QuestionHandler),
+        ("/ws/multi",                       MultiAccountWebSocket),
+        ("/multi_accounts",                 MultiAccountListHandler),
+        (r"/multi_accounts/control/(.+)",   MultiAccountControlHandler),
+        ("/multi_accounts/bulk",            MultiAccountBulkHandler),
+        ("/multi_accounts/config",          MultiAccountConfigHandler),
         ('/(.*)', NoCacheStaticFileHandler, {"path": os.path.join(SCRIPT_DIR, 'www')}),
     ])
     app.ocr = ocr;
@@ -818,7 +893,7 @@ async def main_server():
     app.listen(server_port)
     print("server running on port:", server_port)
 
-    url = "http://127.0.0.1:" + str(server_port) + "/settings.html"
+    url = "http://127.0.0.1:" + str(server_port) + "/index.html"
     print("goto url:", url)
     webbrowser.open_new(url)
     await asyncio.Event().wait()

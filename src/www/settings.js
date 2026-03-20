@@ -1,11 +1,10 @@
-
 // action bar
 const run_button = document.querySelector('#run_btn');
 const save_button = document.querySelector('#save_btn');
 const reset_button = document.querySelector('#reset_btn');
 const exit_button = document.querySelector('#exit_btn');
-const pause_button = document.querySelector('#pause_btn');
-const resume_button = document.querySelector('#resume_btn');
+const pause_button = document.querySelector('#pause_btn') || null;
+const resume_button = document.querySelector('#resume_btn') || null;
 
 // preference
 const homepage = document.querySelector('#homepage');
@@ -839,12 +838,12 @@ var status_interval= setInterval(() => {
 
 maxbot_version_api();
 
-run_button.addEventListener('click', maxbot_launch);
-save_button.addEventListener('click', maxbot_save);
-reset_button.addEventListener('click', maxbot_reset_api);
-exit_button.addEventListener('click', maxbot_shutdown_api);
-pause_button.addEventListener('click', maxbot_pause_api);
-resume_button.addEventListener('click', maxbot_resume_api);
+if (run_button)    run_button.addEventListener('click', maxbot_launch);
+if (save_button)   save_button.addEventListener('click', maxbot_save);
+if (reset_button)  reset_button.addEventListener('click', maxbot_reset_api);
+if (exit_button)   exit_button.addEventListener('click', maxbot_shutdown_api);
+if (pause_button)  pause_button.addEventListener('click', maxbot_pause_api);
+if (resume_button) resume_button.addEventListener('click', maxbot_resume_api);
 
 const onchange_tag_list = ["input","select","textarea"];
 onchange_tag_list.forEach((tag) => {
@@ -944,12 +943,12 @@ document.querySelector('#btn_test_telegram').addEventListener('click', function(
     });
 });
 
-let runMessageClearTimer;
-
+var runMessageClearTimer;
 function run_message(msg)
 {
     clearTimeout(runMessageClearTimer);
     const message = document.querySelector('#run_btn_pressed_message');
+    if (!message) return;
     message.innerText = msg;
     runMessageClearTimer = setTimeout(function ()
         {
@@ -1330,3 +1329,389 @@ document.addEventListener('keydown', function(e) {
 window.addEventListener('beforeunload', () => {
     stopQuestionPolling();
 });
+
+// // ════════════════════════════════════════════════════════════════════
+// // 多帳號管理模組 v2
+// // ════════════════════════════════════════════════════════════════════
+// (function () {
+//     'use strict';
+
+//     const PORT = window.location.port || 16888;
+//     let maWs = null, maWsRetries = 0;
+//     let maAccounts = {};
+//     window.maConfigList = [];
+//     let maConfigList = window.maConfigList;
+
+//     const STATUS_BS = {
+//         idle: 'secondary', starting: 'primary', running: 'primary',
+//         selecting: 'info', captcha: 'warning', cloudflare: 'warning',
+//         ordering: 'info', success: 'success', sold_out: 'warning',
+//         paused: 'secondary', error: 'danger', stopped: 'secondary',
+//     };
+//     const STATUS_PULSE = ['starting', 'running', 'selecting', 'captcha', 'cloudflare', 'ordering', 'sold_out'];
+
+//     // ── 帳號列渲染（自動填表單 Tab）────────────────────────────────
+//     function maRowHtml(entry, idx) {
+//         const ao = entry.accounts_override || {};
+//         const platform = entry.platform || 'kktix';
+//         const platKey = platform + '_account';
+//         const passKey = platform + '_password';
+//         return `
+//         <div class="row mb-3" id="ma-row-card-${idx}" data-ma-idx="${idx}">
+//           <input type="hidden" class="ma-row-id" value="${maEsc(entry.id || '')}">
+
+//           <label class="col-sm-2 col-form-label d-flex align-items-center gap-1">
+//             <select class="form-select form-select-sm ma-row-platform" style="max-width:120px;">
+//               ${['kktix','tixcraft','famiticket','ibon','ticketplus','kham','cityline','hkticketing'].map(p =>
+//                 `<option value="${p}" ${platform === p ? 'selected' : ''}>${p}</option>`
+//               ).join('')}
+//             </select>
+//           </label>
+
+//           <div class="col-sm-10 col-lg-8 col-xl-6">
+//             <form autocomplete="off">
+//             <div class="input-group mb-2">
+//               <span class="input-group-text">名稱</span>
+//               <input type="text" class="form-control ma-row-name"
+//                 placeholder="帳號名稱（顯示用）" value="${maEsc(entry.name || '')}">
+//               <span class="input-group-text">帳號</span>
+//               <input type="text" class="form-control ma-row-account"
+//                 placeholder="留空沿用全域" value="${maEsc(ao[platKey] || '')}" autocomplete="username">
+//               <span class="input-group-text">密碼</span>
+//               <input type="password" class="form-control ma-row-password"
+//                 placeholder="留空沿用全域" value="${maEsc(ao[passKey] || '')}" autocomplete="current-password">
+//               <button type="button" class="btn btn-outline-danger" onclick="maDeleteRow(${idx})">✕</button>
+//             </div>
+//             </form>
+
+//             <div class="input-group">
+//               <span class="input-group-text">目標網址</span>
+//               <input type="text" class="form-control ma-row-homepage"
+//                 placeholder="https://kktix.com/events/... （留空沿用全域 homepage）"
+//                 value="${maEsc(entry.homepage || '')}">
+//             </div>
+
+//             <div class="row g-2 mt-1">
+//               <div class="col-auto">
+//                 <div class="input-group input-group-sm">
+//                   <span class="input-group-text">張數</span>
+//                   <input type="number" class="form-control ma-row-ticket-number"
+//                     style="max-width:60px;" min="1" max="10" value="${entry.ticket_number || 2}">
+//                 </div>
+//               </div>
+//               <div class="col">
+//                 <input type="text" class="form-control form-control-sm ma-row-date-keyword"
+//                   placeholder="場次關鍵字（; 分隔，留空沿用全域）" value="${maEsc(entry.date_keyword || '')}">
+//               </div>
+//               <div class="col">
+//                 <input type="text" class="form-control form-control-sm ma-row-area-keyword"
+//                   placeholder="區域關鍵字（; 分隔，留空沿用全域）" value="${maEsc(entry.area_keyword || '')}">
+//               </div>
+//             </div>
+
+//           </div>
+//         </div>`;
+//     }
+
+//     window.maRenderConfigList = function maRenderConfigList() {
+//         const container = document.getElementById('ma-accounts-list');
+//         if (!container) return;
+//         container.innerHTML = maConfigList.length
+//             ? maConfigList.map((e, i) => maRowHtml(e, i)).join('')
+//             : '';
+//     }
+
+//     window.maDeleteRow = function (idx) {
+//         maConfigList.splice(idx, 1);
+//         maRenderConfigList();
+//         maSaveConfig();
+//     };
+
+//     // 從 DOM 讀回所有列的值，存進 maConfigList
+//     function maCollectFromDOM() {
+//         const rows = document.querySelectorAll('#ma-accounts-list [data-ma-idx]');
+//         const result = [];
+//         rows.forEach((row, idx) => {
+//             const platform = row.querySelector('.ma-row-platform')?.value || 'kktix';
+//             const account  = row.querySelector('.ma-row-account')?.value.trim() || '';
+//             const password = row.querySelector('.ma-row-password')?.value.trim() || '';
+//             const ao = {};
+//             if (account)  ao[platform + '_account']  = account;
+//             if (password) ao[platform + '_password'] = password;
+//             result.push({
+//                 id:               row.querySelector('.ma-row-id')?.value || maConfigList[idx]?.id || ('acc_' + idx),
+//                 name:             row.querySelector('.ma-row-account')?.value.trim() || `帳號 ${idx + 1}`,
+//                 platform,
+//                 homepage:         row.querySelector('.ma-row-homepage')?.value.trim() || '',
+//                 ticket_number:    parseInt(row.querySelector('.ma-row-ticket-number')?.value) || 2,
+//                 date_keyword:     row.querySelector('.ma-row-date-keyword')?.value.trim() || '',
+//                 area_keyword:     row.querySelector('.ma-row-area-keyword')?.value.trim() || '',
+//                 accounts_override: ao,
+//             });
+//         });
+//         return result;
+//     }
+
+//     async function maSaveConfig() {
+//         const list = maCollectFromDOM();
+//         await fetch('/multi_accounts/config', {
+//             method: 'POST',
+//             headers: { 'Content-Type': 'application/json' },
+//             body: JSON.stringify({ multi_accounts: list })
+//         });
+//         maConfigList = list;
+//     }
+
+//     // 攔截原本的存檔按鈕，一起儲存多帳號
+//     const _origSave = window.maxbot_save_api;
+//     if (typeof _origSave === 'function') {
+//         window.maxbot_save_api = async function () {
+//             await maSaveConfig();
+//             _origSave();
+//         };
+//     }
+//     document.getElementById('save_btn')?.addEventListener('click', () => maSaveConfig(), true);
+
+//     // ── WebSocket（搶票監控 Tab）────────────────────────────────────
+//     function maConnectWS() {
+//         maWs = new WebSocket(`ws://127.0.0.1:${PORT}/ws/multi`);
+//         maWs.onopen = () => { maWsRetries = 0; setWsLabel('🟢 已連線'); };
+//         maWs.onmessage = (e) => {
+//             let data; try { data = JSON.parse(e.data); } catch { return; }
+//             if (data.type === 'init') {
+//                 maAccounts = {};
+//                 (data.accounts || []).forEach(a => { maAccounts[a.account_id] = a; });
+//                 maRenderAllCards();
+//             } else if (data.type === 'status_update') {
+//                 const a = data.account;
+//                 maAccounts[a.account_id] = a;
+//                 maUpsertCard(a);
+//                 if (a.status === 'success') showMaToast(`🎉 ${maEsc(a.name)} 搶票成功！`, 'success');
+//                 if (a.status === 'error')   showMaToast(`❌ ${maEsc(a.name)} 發生錯誤`, 'danger');
+//             } else if (data.type === 'account_removed') {
+//                 delete maAccounts[data.account_id];
+//                 document.getElementById(`ma-card-${data.account_id}`)?.remove();
+//                 maUpdateEmpty();
+//             }
+//         };
+//         maWs.onclose = () => {
+//             setWsLabel('🔴 連線中斷');
+//             setTimeout(maConnectWS, Math.min(1000 * 2 ** maWsRetries++, 10000));
+//         };
+//         maWs.onerror = () => setWsLabel('🔴 連線失敗');
+//     }
+
+//     function setWsLabel(text) {
+//         const el = document.getElementById('ma-ws-status');
+//         if (el) el.textContent = text;
+//     }
+
+//     function maRenderAllCards() {
+//         Object.values(maAccounts).forEach(maUpsertCard);
+//         maUpdateEmpty();
+//     }
+
+//     function maUpdateEmpty() {
+//         const hasCards = Object.keys(maAccounts).length > 0;
+//         const empty = document.getElementById('ma-empty-state');
+//         if (empty) empty.style.display = hasCards ? 'none' : '';
+//     }
+
+//     function maUpsertCard(acc) {
+//         const containerId = `ma-card-${acc.account_id}`;
+//         let card = document.getElementById(containerId);
+//         const bsColor = STATUS_BS[acc.status] || 'secondary';
+//         const isPulse = STATUS_PULSE.includes(acc.status);
+//         const urlHtml = acc.current_url
+//             ? `<a href="${maEsc(acc.current_url)}" target="_blank" style="font-size:0.75rem;color:var(--pink);word-break:break-all;">${maEsc(acc.current_url.substring(0, 70))}${acc.current_url.length > 70 ? '…' : ''}</a>`
+//             : `<span style="font-size:0.75rem;color:#aaa;">尚未訪問任何頁面</span>`;
+//         const logHtml = (acc.logs || []).slice(-15).map(line => {
+//             let color = '#aaa';
+//             const sl = line.toLowerCase();
+//             if (sl.includes('成功') || sl.includes('success')) color = '#20c997';
+//             else if (sl.includes('[error]') || sl.includes('traceback')) color = '#dc3545';
+//             else if (sl.includes('captcha') || sl.includes('cloudflare')) color = '#ffc107';
+//             else if (sl.includes('[multiaccou')) color = '#0dcaf0';
+//             return `<div style="color:${color};padding:1px 0;">${maEsc(line)}</div>`;
+//         }).join('');
+//         const runBtn = acc.is_running
+//             ? `<button class="btn btn-sm btn-outline-primary" onclick="maStop('${acc.account_id}')">■ 停止</button>`
+//             : `<button class="btn btn-sm btn-primary" onclick="maRestart('${acc.account_id}')">▶ 重啟</button>`;
+//         const cardHtml = `
+//         <div class="card h-100" style="border-top:3px solid var(--bs-${bsColor},#6c757d);">
+//           <div class="card-header d-flex align-items-center gap-2 py-2">
+//             <span class="badge bg-${bsColor}" style="${isPulse ? 'animation:ma-pulse 1.2s ease-in-out infinite;' : ''}">${maEsc(acc.status_label)}</span>
+//             <strong class="flex-grow-1" style="font-size:0.9rem;">${maEsc(acc.display_name || acc.name)}</strong>
+//             <span class="text-muted" style="font-size:0.75rem;">🎫 ${acc.ticket_number}張</span>
+//           </div>
+//           <div class="card-body p-2">
+//             <div class="mb-2">${urlHtml}</div>
+//             <div style="background:#111;border-radius:6px;padding:6px 8px;height:110px;overflow-y:auto;font-family:monospace;font-size:0.72rem;line-height:1.5;" id="ma-log-${acc.account_id}">${logHtml || '<span style="color:#555;">等待輸出…</span>'}</div>
+//           </div>
+//           <div class="card-footer d-flex gap-2 py-2">
+//             ${runBtn}
+//             <button class="btn btn-sm btn-outline-danger ms-auto" onclick="maRemove('${acc.account_id}')">🗑 移除</button>
+//           </div>
+//         </div>`;
+//         if (!card) {
+//             const col = document.createElement('div');
+//             col.className = 'col-12 col-md-6 col-xl-4';
+//             col.id = containerId;
+//             col.innerHTML = cardHtml;
+//             document.getElementById('ma-cards-container')?.appendChild(col);
+//             maUpdateEmpty();
+//         } else {
+//             card.innerHTML = cardHtml;
+//         }
+//         const logEl = document.getElementById(`ma-log-${acc.account_id}`);
+//         if (logEl) logEl.scrollTop = logEl.scrollHeight;
+//     }
+
+//     window.maStop = async (id) => fetch(`/multi_accounts/control/${id}?action=stop`, { method: 'POST' });
+//     window.maRemove = async (id) => {
+//         if (!confirm('確定移除此搶票實例？')) return;
+//         fetch(`/multi_accounts/control/${id}?action=remove`, { method: 'POST' });
+//     };
+//     window.maRestart = async (id) => {
+//         const res = await fetch('/multi_accounts/config');
+//         const data = await res.json();
+//         const entry = (data.multi_accounts || []).find(a => a.id === id);
+//         if (!entry) { showMaToast('找不到帳號設定，請至自動填表單重新儲存', 'warning'); return; }
+//         const r = await fetch('/multi_accounts', {
+//             method: 'POST', headers: { 'Content-Type': 'application/json' },
+//             body: JSON.stringify({ account_entry: entry })
+//         });
+//         const result = await r.json();
+//         if (!result.success) showMaToast(result.message || '啟動失敗', 'danger');
+//     };
+
+//     document.getElementById('ma-start-all-btn')?.addEventListener('click', async () => {
+//         // 先儲存最新輸入，再全部啟動
+//         await maSaveConfig();
+//         const r = await fetch('/multi_accounts/bulk?action=start_all', { method: 'POST' });
+//         const d = await r.json();
+//         if (!d.success) showMaToast(d.message, 'warning');
+//         else showMaToast(`▶ 啟動 ${(d.results || []).length} 個帳號`, 'success');
+//     });
+//     document.getElementById('ma-stop-all-btn')?.addEventListener('click', async () => {
+//         await fetch('/multi_accounts/bulk?action=stop_all', { method: 'POST' });
+//         showMaToast('■ 已停止所有帳號', 'secondary');
+//     });
+//     document.getElementById('pause_btn')?.addEventListener('click', () => fetch('/pause', { method: 'POST' }));
+//     document.getElementById('resume_btn')?.addEventListener('click', () => fetch('/resume', { method: 'POST' }));
+
+//     function showMaToast(msg, type) {
+//         let container = document.getElementById('ma-toast-container');
+//         if (!container) {
+//             container = document.createElement('div');
+//             container.id = 'ma-toast-container';
+//             container.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+//             container.style.zIndex = 9999;
+//             document.body.appendChild(container);
+//         }
+//         const el = document.createElement('div');
+//         el.className = `toast align-items-center text-bg-${type} border-0`;
+//         el.setAttribute('role', 'alert');
+//         el.innerHTML = `<div class="d-flex"><div class="toast-body">${maEsc(msg)}</div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button></div>`;
+//         container.appendChild(el);
+//         new bootstrap.Toast(el, { delay: 3500 }).show();
+//         el.addEventListener('hidden.bs.toast', () => el.remove());
+//     }
+
+//     function maEsc(s) {
+//         return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+//     }
+
+//     if (!document.getElementById('ma-pulse-style')) {
+//         const style = document.createElement('style');
+//         style.id = 'ma-pulse-style';
+//         style.textContent = '@keyframes ma-pulse{0%,100%{opacity:1}50%{opacity:.4}}';
+//         document.head.appendChild(style);
+//     }
+
+//     // ── 初始化：載入已儲存的帳號列 ────────────────────────────────
+//     async function maInit() {
+//         try {
+//             const res = await fetch('/multi_accounts/config');
+//             const data = await res.json();
+//             maConfigList.length = 0;
+//             (data.multi_accounts || []).forEach(function(item) { maConfigList.push(item); });
+//             maRenderConfigList();
+//         } catch (e) {
+//             console.warn('[MultiAccount] 無法載入設定', e);
+//         }
+
+//         // ── 綁定新增按鈕（確保 DOM 已存在）──────────────────────
+//         function bindAddBtn() {
+//             const btn = document.getElementById('ma-add-btn');
+//             if (btn) {
+//                 btn.addEventListener('click', () => {
+//                     maConfigList.push({
+//                         id: 'acc_' + Math.random().toString(36).slice(2, 8),
+//                         name: '',
+//                         platform: 'kktix',
+//                         homepage: '',
+//                         ticket_number: 2,
+//                         date_keyword: '',
+//                         area_keyword: '',
+//                         accounts_override: {}
+//                     });
+//                     maRenderConfigList();
+//                     const list = document.getElementById('ma-accounts-list');
+//                     list?.lastElementChild?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+//                 });
+//             }
+//         }
+//         bindAddBtn();
+
+//         // WS 連線
+//         document.getElementById('runtime-tab')?.addEventListener('shown.bs.tab', () => {
+//             if (!maWs || maWs.readyState === WebSocket.CLOSED) maConnectWS();
+//         });
+
+//         // 如果目前已在搶票監控 Tab，立即連線
+//         if (document.getElementById('runtime-tab-pane')?.classList.contains('active')) {
+//             maConnectWS();
+//         }
+
+//         // 頁面載入後延遲嘗試連線
+//         setTimeout(function() {
+//             if (!maWs || maWs.readyState === WebSocket.CLOSED) maConnectWS();
+//         }, 1000);
+
+//         // Fallback polling
+//         setInterval(() => {
+//             if (maWs && maWs.readyState === WebSocket.OPEN) return;
+//             fetch('/multi_accounts').then(r => r.json()).then(data => {
+//                 (data.accounts || []).forEach(a => { maAccounts[a.account_id] = a; maUpsertCard(a); });
+//                 maUpdateEmpty();
+//             }).catch(() => {});
+//         }, 5000);
+//     }
+
+//     maInit();
+
+// })();
+
+// // 多帳號新增（全域，由 HTML onclick 呼叫）
+// function maAddAccount() {
+//     if (typeof window.maConfigList === 'undefined') {
+//         console.error('maConfigList 未定義，多帳號模組未載入');
+//         return;
+//     }
+//     window.maConfigList.push({
+//         id: 'acc_' + Math.random().toString(36).slice(2, 8),
+//         name: '',
+//         platform: 'kktix',
+//         homepage: '',
+//         ticket_number: 2,
+//         date_keyword: '',
+//         area_keyword: '',
+//         accounts_override: {}
+//     });
+//     window.maRenderConfigList();
+//     const list = document.getElementById('ma-accounts-list');
+//     if (list && list.lastElementChild) {
+//         list.lastElementChild.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+//     }
+// }

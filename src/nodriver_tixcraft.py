@@ -514,6 +514,12 @@ async def main(args):
         # Failed to connect to browser
         # One of the causes could be when you are running as root.
         # In that case you need to pass no_sandbox=True
+        import sys as _sys
+        if _sys.platform == "darwin" and not conf.browser_executable_path:
+            import os as _os
+            _mac_chrome = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+            if _os.path.exists(_mac_chrome):
+                conf.browser_executable_path = _mac_chrome
         driver = await uc.start(conf, no_sandbox=True, headless=config_dict["advanced"]["headless"])
         #driver = await uc.start(conf, sandbox=sandbox, headless=config_dict["advanced"]["headless"])
         #driver = await uc.start(conf)
