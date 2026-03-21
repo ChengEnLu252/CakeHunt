@@ -41,8 +41,22 @@ jobs:
         run: pyinstaller --onedir --windowed --add-data "src/assets:assets" --add-data "src/platforms:platforms" --hidden-import ddddocr --hidden-import multi_account_manager --paths src --name "nodriver_tixcraft" src/nodriver_tixcraft.py
       - name: Zip Mac output
         run: |
+          chmod +x dist/CakeHunt/CakeHunt
+          chmod +x dist/nodriver_tixcraft/nodriver_tixcraft
+          xattr -cr dist/CakeHunt
+          xattr -cr dist/nodriver_tixcraft
+          cat > dist/開啟CakeHunt.command << 'EOF'
+          #!/bin/bash
+          DIR="$(cd "$(dirname "$0")" && pwd)"
+          xattr -cr "$DIR/CakeHunt"
+          xattr -cr "$DIR/nodriver_tixcraft"
+          chmod +x "$DIR/CakeHunt/CakeHunt"
+          chmod +x "$DIR/nodriver_tixcraft/nodriver_tixcraft"
+          open "$DIR/CakeHunt/CakeHunt"
+          EOF
+          chmod +x dist/開啟CakeHunt.command
           cd dist
-          zip -r CakeHunt-Mac.zip CakeHunt nodriver_tixcraft
+          zip -r --symlinks CakeHunt-Mac.zip CakeHunt nodriver_tixcraft 開啟CakeHunt.command
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
