@@ -4,28 +4,6 @@ on:
     tags:
       - "v*"
 jobs:
-  build-windows:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - name: Install dependencies
-        run: pip install pyinstaller && pip install -r requirement.txt
-      - name: Build CakeHunt
-        run: pyinstaller --onefile --noconsole --add-data "src/www;www" --add-data "src/assets;assets" --hidden-import tornado.websocket --hidden-import ddddocr --hidden-import multi_account_manager --paths src --name "CakeHunt" src/settings.py
-      - name: Build nodriver_tixcraft
-        run: pyinstaller --onefile --noconsole --add-data "src/assets;assets" --add-data "src/platforms;platforms" --hidden-import ddddocr --hidden-import multi_account_manager --paths src --name "nodriver_tixcraft" src/nodriver_tixcraft.py
-      - name: Upload
-        uses: actions/upload-artifact@v4
-        with:
-          name: CakeHunt-Windows
-          compression-level: 0
-          path: |
-            dist/CakeHunt.exe
-            dist/nodriver_tixcraft.exe
-
   build-mac:
     runs-on: macos-latest
     steps:
@@ -39,27 +17,17 @@ jobs:
         run: pyinstaller --onedir --windowed --add-data "src/www:www" --add-data "src/assets:assets" --hidden-import tornado.websocket --hidden-import ddddocr --hidden-import multi_account_manager --paths src --name "CakeHunt" src/settings.py
       - name: Build nodriver_tixcraft
         run: pyinstaller --onedir --windowed --add-data "src/assets:assets" --add-data "src/platforms:platforms" --hidden-import ddddocr --hidden-import multi_account_manager --paths src --name "nodriver_tixcraft" src/nodriver_tixcraft.py
-      - name: Zip Mac output
+      - name: Package Mac output
         run: |
           chmod +x dist/CakeHunt/CakeHunt
           chmod +x dist/nodriver_tixcraft/nodriver_tixcraft
-          xattr -cr dist/CakeHunt
-          xattr -cr dist/nodriver_tixcraft
-          cat > dist/開啟CakeHunt.command << 'EOF'
-          #!/bin/bash
-          DIR="$(cd "$(dirname "$0")" && pwd)"
-          xattr -cr "$DIR/CakeHunt"
-          xattr -cr "$DIR/nodriver_tixcraft"
-          chmod +x "$DIR/CakeHunt/CakeHunt"
-          chmod +x "$DIR/nodriver_tixcraft/nodriver_tixcraft"
-          open "$DIR/CakeHunt/CakeHunt"
-          EOF
+          printf '#!/bin/bash\nDIR="$(cd "$(dirname "$0")" && pwd)"\nxattr -cr "$DIR/CakeHunt"\nxattr -cr "$DIR/nodriver_tixcraft"\nchmod +x "$DIR/CakeHunt/CakeHunt"\nchmod +x "$DIR/nodriver_tixcraft/nodriver_tixcraft"\nopen "$DIR/CakeHunt/CakeHunt"\n' > dist/開啟CakeHunt.command
           chmod +x dist/開啟CakeHunt.command
           cd dist
-          zip -r --symlinks CakeHunt-Mac.zip CakeHunt nodriver_tixcraft 開啟CakeHunt.command
+          tar -czf CakeHunt-Mac.tar.gz CakeHunt nodriver_tixcraft 開啟CakeHunt.command
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
           name: CakeHunt-Mac
           compression-level: 0
-          path: dist/CakeHunt-Mac.zip
+          path: dist/CakeHunt-Mac.tar.gz
