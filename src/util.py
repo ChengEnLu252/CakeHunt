@@ -2074,7 +2074,8 @@ def launch_maxbot(script_name="nodriver_tixcraft", filename="", homepage="", kkt
             bot_path = os.path.join(parent_dir, 'nodriver_tixcraft', 'nodriver_tixcraft')
             if not os.path.exists(bot_path):
                 bot_path = os.path.join(exe_dir, 'nodriver_tixcraft')
-            cmd = bot_path + ' ' + ' '.join(cmd_argument)
+            config_path = os.path.join(exe_dir, 'settings.json')
+            cmd = bot_path + ' --input=' + config_path + ' ' + ' '.join(cmd_argument)
         if platform.system() == 'Linux':
             print("execute linux binary")
         if platform.system() == 'Windows':
