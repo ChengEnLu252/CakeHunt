@@ -520,6 +520,9 @@ async def main(args):
             _mac_chrome = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
             if _os.path.exists(_mac_chrome):
                 conf.browser_executable_path = _mac_chrome
+                print(f"[Chrome] 使用路徑：{_mac_chrome}")
+            else:
+                print(f"[Chrome] 找不到Chrome：{_mac_chrome}")
         driver = await uc.start(conf, no_sandbox=True, headless=config_dict["advanced"]["headless"])
         #driver = await uc.start(conf, sandbox=sandbox, headless=config_dict["advanced"]["headless"])
         #driver = await uc.start(conf)
