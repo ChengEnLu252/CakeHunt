@@ -232,8 +232,15 @@ class MultiAccountManager:
                 if _sys.platform == 'win32':
                     _bot_exe = _os.path.join(_exe_dir, 'nodriver_tixcraft.exe')
                 else:
-                    _bot_exe = _os.path.join(_exe_dir, 'nodriver_tixcraft')
+                    # --onedir 模式：nodriver_tixcraft 在上一層的同名資料夾內
+                    _parent_dir = _os.path.dirname(_exe_dir)
+                    _bot_exe = _os.path.join(_parent_dir, 'nodriver_tixcraft', 'nodriver_tixcraft')
+                    if not _os.path.exists(_bot_exe):
+                        # fallback：同層目錄
+                        _bot_exe = _os.path.join(_exe_dir, 'nodriver_tixcraft')
                 _cmd = [_bot_exe, "--input", config_path]
+                acc.add_log(f"[MultiAccount] 執行路徑：{_cmd[0]}")
+                acc.add_log(f"[MultiAccount] 路徑存在：{_os.path.exists(_cmd[0])}")
             else:
                 # 開發模式：用 Python 執行 .py
                 _cmd = [_sys.executable, "-u", self._bot_script, "--input", config_path]

@@ -2069,6 +2069,12 @@ def launch_maxbot(script_name="nodriver_tixcraft", filename="", homepage="", kkt
         cmd = './' + script_name + ' ' + ' '.join(cmd_argument)
         if platform.system() == 'Darwin':
             print("execute MacOS python script")
+            exe_dir = os.path.dirname(sys.executable)
+            parent_dir = os.path.dirname(exe_dir)
+            bot_path = os.path.join(parent_dir, 'nodriver_tixcraft', 'nodriver_tixcraft')
+            if not os.path.exists(bot_path):
+                bot_path = os.path.join(exe_dir, 'nodriver_tixcraft')
+            cmd = bot_path + ' ' + ' '.join(cmd_argument)
         if platform.system() == 'Linux':
             print("execute linux binary")
         if platform.system() == 'Windows':
