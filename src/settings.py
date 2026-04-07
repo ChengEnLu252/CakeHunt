@@ -4,6 +4,7 @@ import asyncio
 import base64
 import json
 import os
+import platform
 import subprocess
 import sys
 import threading
@@ -61,6 +62,10 @@ CONST_MAXBOT_LAST_URL_FILE = "MAXBOT_LAST_URL.txt"
 CONST_MAXBOT_QUESTION_FILE = "MAXBOT_QUESTION.txt"
 
 CONST_SERVER_PORT = 16888
+
+# ── 單帳號 Bot 進程追蹤 ────────────────────────────────────────────────────────
+# 儲存目前執行中的 bot subprocess，讓重新搶票時可以先砍掉舊進程
+_single_bot_process = None
 
 CONST_FROM_TOP_TO_BOTTOM = "from top to bottom"
 CONST_FROM_BOTTOM_TO_TOP = "from bottom to top"
@@ -337,12 +342,49 @@ def maxbot_resume():
     for i in range(3):
          util.force_remove_file(idle_filepath)
 
+def stop_single_bot():
+    """砍掉單帳號 bot 進程（Chrome 也會一起關閉）"""
+    global _single_bot_process
+    if _single_bot_process is not None:
+        if _single_bot_process.poll() is None:  # 還在跑
+            try:
+                # 先砍整個進程群組（包含 Chrome 子進程）
+                import signal
+                try:
+                    if platform.system() != 'Windows':
+                        os.killpg(os.getpgid(_single_bot_process.pid), signal.SIGTERM)
+                    else:
+                        _single_bot_process.terminate()
+                except Exception:
+                    _single_bot_process.terminate()
+                _single_bot_process.wait(timeout=8)
+                print("[BotManager] 舊的 bot 進程已終止")
+            except Exception:
+                try:
+                    _single_bot_process.kill()
+                    print("[BotManager] 舊的 bot 進程已強制終止")
+                except Exception:
+                    pass
+        _single_bot_process = None
+
+    # Mac 上 Chrome 需要額外時間釋放 user data dir lock
+    if platform.system() == 'Darwin':
+        time.sleep(2)
+    else:
+        time.sleep(0.5)
+
+    # 確保 idle 檔清除，避免新進程一啟動就進暫停狀態
+    maxbot_resume()
+
 def launch_maxbot():
-    global launch_counter
+    global launch_counter, _single_bot_process
     if "launch_counter" in globals():
         launch_counter += 1
     else:
         launch_counter = 0
+
+    # ── 先砍掉舊的 bot 進程 ──────────────────────────────────────────────────
+    stop_single_bot()
 
     config_filepath, config_dict = load_json()
 
@@ -354,13 +396,45 @@ def launch_maxbot():
             size_array = window_size.split(",")
             target_width = int(size_array[0])
             target_left = target_width * launch_counter
-            #print("target_left:", target_left)
             if target_left >= 1440:
                 launch_counter = 0
             window_size = window_size + "," + str(launch_counter)
-            #print("window_size:", window_size)
 
-    threading.Thread(target=util.launch_maxbot, args=(script_name,"","","","",window_size,)).start()
+    # ── 直接啟動並儲存進程參考 ───────────────────────────────────────────────
+    def _do_launch():
+        global _single_bot_process
+        working_dir = util.get_app_root()
+        cmd_argument = []
+        if len(window_size) > 0:
+            cmd_argument.append('--window_size=' + window_size)
+
+        try:
+            if hasattr(sys, 'frozen'):
+                print("execute in frozen mode")
+                if platform.system() == 'Darwin':
+                    exe_dir = os.path.dirname(sys.executable)
+                    parent_dir = os.path.dirname(exe_dir)
+                    bot_path = os.path.join(parent_dir, 'nodriver_tixcraft', 'nodriver_tixcraft')
+                    if not os.path.exists(bot_path):
+                        bot_path = os.path.join(exe_dir, 'nodriver_tixcraft')
+                    config_path = os.path.join(exe_dir, 'settings.json')
+                    cmd = [bot_path, '--input=' + config_path] + cmd_argument
+                elif platform.system() == 'Windows':
+                    cmd = [script_name + '.exe'] + cmd_argument
+                else:
+                    cmd = ['./' + script_name] + cmd_argument
+                proc = subprocess.Popen(cmd, cwd=working_dir)
+            else:
+                interpreter_binary = sys.executable
+                print("execute in shell mode.")
+                cmd_array = [interpreter_binary, script_name + '.py'] + cmd_argument
+                proc = subprocess.Popen(cmd_array, cwd=working_dir)
+            _single_bot_process = proc
+            print(f"[BotManager] Bot 啟動，PID: {proc.pid}")
+        except Exception as exc:
+            print(f"[BotManager] 啟動失敗：{exc}")
+
+    threading.Thread(target=_do_launch, daemon=True).start()
 
 def change_maxbot_status_by_keyword():
     config_filepath, config_dict = load_json()
@@ -450,7 +524,14 @@ class ShutdownHandler(tornado.web.RequestHandler):
     def get(self):
         global GLOBAL_SERVER_SHUTDOWN
         GLOBAL_SERVER_SHUTDOWN = True
+        stop_single_bot()  # 關閉 server 時同時砍掉 bot 進程
         self.write({"showdown": GLOBAL_SERVER_SHUTDOWN})
+
+class StopBotHandler(tornado.web.RequestHandler):
+    """停止單帳號 bot（關閉 Chrome），不關閉 settings server"""
+    def get(self):
+        stop_single_bot()
+        self.write({"stopped": True})
 
 class StatusHandler(tornado.web.RequestHandler):
     def get(self):
@@ -853,6 +934,7 @@ async def main_server():
     app = Application([
         ("/version", VersionHandler),
         ("/shutdown", ShutdownHandler),
+        ("/stop_bot", StopBotHandler),
         ("/sendkey", SendkeyHandler),
 
         # status api

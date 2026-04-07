@@ -1,31 +1,142 @@
 name: Build CakeHunt
+
 on:
   push:
     tags:
       - "v*"
+
 jobs:
   build-mac:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+
       - name: Install dependencies
-        run: pip install pyinstaller && pip install -r requirement.txt
-      - name: Build CakeHunt
-        run: pyinstaller --onedir --windowed --add-data "src/www:www" --add-data "src/assets:assets" --hidden-import tornado.websocket --hidden-import ddddocr --hidden-import multi_account_manager --paths src --name "CakeHunt" src/settings.py
+        run: |
+          pip install --upgrade pip
+          pip install pyinstaller
+          pip install -r requirement.txt
+
+      # ── Build 1：settings (CakeHunt 主介面) ─────────────────────────────
+      # ⚠️ 不用 --windowed：
+      #   - --windowed 在 Mac 會包成 .app bundle，sys.executable 路徑變成
+      #     CakeHunt.app/Contents/MacOS/CakeHunt，破壞 bot 路徑邏輯
+      #   - 用 .command 腳本開啟，使用者看得到 log，好除錯
+      - name: Build settings (CakeHunt)
+        run: |
+          pyinstaller \
+            --onedir \
+            --console \
+            --add-data "src/www:www" \
+            --add-data "src/assets:assets" \
+            --paths src \
+            --hidden-import tornado \
+            --hidden-import tornado.web \
+            --hidden-import tornado.ioloop \
+            --hidden-import tornado.httpserver \
+            --hidden-import tornado.websocket \
+            --hidden-import multi_account_manager \
+            --hidden-import util \
+            --hidden-import NonBrowser \
+            --hidden-import ddddocr \
+            --hidden-import onnxruntime \
+            --hidden-import "onnxruntime.capi.onnxruntime_pybind11_state" \
+            --hidden-import "PIL" \
+            --hidden-import "PIL.Image" \
+            --hidden-import numpy \
+            --hidden-import requests \
+            --hidden-import platform \
+            --hidden-import signal \
+            --name "CakeHunt" \
+            src/settings.py
+
+      # ── Build 2：nodriver_tixcraft (搶票 bot) ────────────────────────────
+      # ⚠️ 絕對不能用 --windowed：
+      #   - multi_account_manager 靠讀取 stdout 判斷搶票狀態
+      #   - --windowed 會讓 stdout 變 null，監控頁完全失效
       - name: Build nodriver_tixcraft
-        run: pyinstaller --onedir --windowed --add-data "src/assets:assets" --add-data "src/platforms:platforms" --hidden-import ddddocr --hidden-import multi_account_manager --paths src --name "nodriver_tixcraft" src/nodriver_tixcraft.py
+        run: |
+          pyinstaller \
+            --onedir \
+            --console \
+            --add-data "src/assets:assets" \
+            --add-data "src/www:www" \
+            --paths src \
+            --hidden-import ddddocr \
+            --hidden-import onnxruntime \
+            --hidden-import "onnxruntime.capi.onnxruntime_pybind11_state" \
+            --hidden-import zendriver \
+            --hidden-import "zendriver.cdp" \
+            --hidden-import "zendriver.core" \
+            --hidden-import util \
+            --hidden-import NonBrowser \
+            --hidden-import chrome_downloader \
+            --hidden-import nodriver_common \
+            --hidden-import settings \
+            --hidden-import multi_account_manager \
+            --hidden-import "platforms.facebook" \
+            --hidden-import "platforms.fansigo" \
+            --hidden-import "platforms.cityline" \
+            --hidden-import "platforms.famiticket" \
+            --hidden-import "platforms.ticketplus" \
+            --hidden-import "platforms.funone" \
+            --hidden-import "platforms.kktix" \
+            --hidden-import "platforms.tixcraft" \
+            --hidden-import "platforms.ibon" \
+            --hidden-import "platforms.kham" \
+            --hidden-import "platforms.hkticketing" \
+            --hidden-import "PIL" \
+            --hidden-import "PIL.Image" \
+            --hidden-import cv2 \
+            --hidden-import numpy \
+            --hidden-import requests \
+            --hidden-import urllib3 \
+            --hidden-import certifi \
+            --hidden-import cryptography \
+            --hidden-import playsound \
+            --hidden-import pyperclip \
+            --hidden-import platform \
+            --hidden-import signal \
+            --name "nodriver_tixcraft" \
+            src/nodriver_tixcraft.py
+
       - name: Package Mac output
         run: |
+          # 執行權限
           chmod +x dist/CakeHunt/CakeHunt
           chmod +x dist/nodriver_tixcraft/nodriver_tixcraft
-          printf '#!/bin/bash\nDIR="$(cd "$(dirname "$0")" && pwd)"\nxattr -cr "$DIR/CakeHunt"\nxattr -cr "$DIR/nodriver_tixcraft"\nchmod +x "$DIR/CakeHunt/CakeHunt"\nchmod +x "$DIR/nodriver_tixcraft/nodriver_tixcraft"\nopen "$DIR/CakeHunt/CakeHunt"\n' > dist/開啟CakeHunt.command
+
+          # 清除 Gatekeeper 隔離標記（Actions 環境通常不需要，但打包給使用者時必要）
+          xattr -cr dist/CakeHunt || true
+          xattr -cr dist/nodriver_tixcraft || true
+
+          # 建立使用者雙擊啟動腳本
+          # 雙擊 .command 會在 Terminal 開啟，使用者可以看到 log
+          cat > dist/開啟CakeHunt.command << 'EOF'
+          #!/bin/bash
+          DIR="$(cd "$(dirname "$0")" && pwd)"
+          # 清除 Gatekeeper 隔離（首次執行必要）
+          xattr -cr "$DIR/CakeHunt" 2>/dev/null || true
+          xattr -cr "$DIR/nodriver_tixcraft" 2>/dev/null || true
+          chmod +x "$DIR/CakeHunt/CakeHunt"
+          chmod +x "$DIR/nodriver_tixcraft/nodriver_tixcraft"
+          # 啟動 CakeHunt
+          "$DIR/CakeHunt/CakeHunt"
+          EOF
           chmod +x dist/開啟CakeHunt.command
+
+          # 打包：用 COPYFILE_DISABLE=1 避免 Mac 的 ._ 隱藏檔混入壓縮包
           cd dist
-          tar -czf CakeHunt-Mac.tar.gz CakeHunt nodriver_tixcraft 開啟CakeHunt.command
-      - name: Upload
+          COPYFILE_DISABLE=1 tar -czf CakeHunt-Mac.tar.gz \
+            CakeHunt \
+            nodriver_tixcraft \
+            開啟CakeHunt.command
+
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: CakeHunt-Mac

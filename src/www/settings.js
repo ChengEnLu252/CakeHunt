@@ -427,6 +427,21 @@ function message_old(msg)
         }, 3000);
 }
 
+function maxbot_stop_bot_api(callback)
+{
+    let api_url = "/stop_bot";
+    $.get( api_url, function() {})
+    .done(function(data) {
+        run_message("Bot 已停止，Chrome 視窗已關閉");
+        console.log("[MaxBot] Stop bot response:", data);
+        if(callback) callback();
+    })
+    .fail(function(xhr, status, error) {
+        console.error("[MaxBot] Stop bot error:", status, error);
+        if(callback) callback();
+    });
+}
+
 function maxbot_launch()
 {
     run_message("啟動 MaxBot 主程式中...");
@@ -456,19 +471,14 @@ function maxbot_run_api()
 
 function maxbot_shutdown_api()
 {
-    let api_url = "/shutdown";
-    $.get( api_url, function() {
-        //alert( "success" );
-    })
-    .done(function(data) {
-        //alert( "second success" );
-        window.close();
-    })
-    .fail(function() {
-        //alert( "error" );
-    })
-    .always(function() {
-        //alert( "finished" );
+    // 先停止 bot，再關閉 server
+    maxbot_stop_bot_api(function() {
+        let api_url = "/shutdown";
+        $.get( api_url, function() {})
+        .done(function(data) {
+            window.close();
+        })
+        .fail(function() {});
     });
 }
 
@@ -844,6 +854,10 @@ if (reset_button)  reset_button.addEventListener('click', maxbot_reset_api);
 if (exit_button)   exit_button.addEventListener('click', maxbot_shutdown_api);
 if (pause_button)  pause_button.addEventListener('click', maxbot_pause_api);
 if (resume_button) resume_button.addEventListener('click', maxbot_resume_api);
+
+// 停止 bot 按鈕（不關閉 server，只關閉 Chrome）
+const stop_bot_button = document.querySelector('#stop_bot_btn');
+if (stop_bot_button) stop_bot_button.addEventListener('click', maxbot_stop_bot_api);
 
 const onchange_tag_list = ["input","select","textarea"];
 onchange_tag_list.forEach((tag) => {

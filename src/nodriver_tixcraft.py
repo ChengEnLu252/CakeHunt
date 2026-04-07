@@ -510,10 +510,6 @@ async def main(args):
         sandbox = False
         conf = get_extension_config(config_dict, args)
         nodriver_overwrite_prefs(conf)
-        # PS: nodrirver run twice always cause error:
-        # Failed to connect to browser
-        # One of the causes could be when you are running as root.
-        # In that case you need to pass no_sandbox=True
         import sys as _sys
         if _sys.platform == "darwin" and not conf.browser_executable_path:
             import os as _os
@@ -523,7 +519,29 @@ async def main(args):
                 print(f"[Chrome] 使用路徑：{_mac_chrome}")
             else:
                 print(f"[Chrome] 找不到Chrome：{_mac_chrome}")
-        driver = await uc.start(conf, no_sandbox=True, headless=config_dict["advanced"]["headless"])
+
+        # Chrome 啟動重試：user data dir 可能被上一個 Chrome 鎖住，最多重試 3 次
+        max_chrome_retries = 3
+        for chrome_retry in range(max_chrome_retries):
+            try:
+                driver = await uc.start(conf, no_sandbox=True, headless=config_dict["advanced"]["headless"])
+                break  # 啟動成功，跳出重試迴圈
+            except Exception as chrome_err:
+                print(f"[Chrome] 啟動失敗（第 {chrome_retry + 1}/{max_chrome_retries} 次）：{chrome_err}")
+                if chrome_retry < max_chrome_retries - 1:
+                    wait_sec = 3 * (chrome_retry + 1)
+                    print(f"[Chrome] 等待 {wait_sec} 秒後重試，重新建立設定（新的 user data 目錄）...")
+                    await asyncio.sleep(wait_sec)
+                    # 重新建立 Config → 會產生全新的 user_data_dir，避免 lock 衝突
+                    conf = get_extension_config(config_dict, args)
+                    nodriver_overwrite_prefs(conf)
+                    if _sys.platform == "darwin" and not conf.browser_executable_path:
+                        _mac_chrome = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+                        if _os.path.exists(_mac_chrome):
+                            conf.browser_executable_path = _mac_chrome
+                else:
+                    print("[Chrome] 已達最大重試次數，放棄啟動")
+                    raise
         #driver = await uc.start(conf, sandbox=sandbox, headless=config_dict["advanced"]["headless"])
         #driver = await uc.start(conf)
         if not driver is None:
@@ -556,6 +574,11 @@ async def main(args):
     else:
         print("Load config error!")
         sys.exit()
+
+    # 判斷是否為多帳號模式：multi_account_manager 啟動時會傳入 --input 參數
+    # 單帳號模式（從前端按搶票）：args.input 為 None → 搶完後正常退出
+    # 多帳號模式（multi_account_manager 啟動）：args.input 有值 → 保持運行讓 manager 追蹤
+    is_multi_account_mode = bool(args and args.input)
 
     url = ""
     last_url = ""
@@ -665,9 +688,10 @@ async def main(args):
         if 'kktix.c' in url:
             is_quit_bot = await nodriver_kktix_main(tab, url, config_dict)
             if is_quit_bot:
-                # 不自動暫停：讓多開實例可獨立運作
-                # 保留 is_quit_bot = False 以防止程式結束，但不建立暫停檔案
-                is_quit_bot = False
+                if is_multi_account_mode:
+                    # 多帳號模式：保持運行，讓 multi_account_manager 追蹤狀態
+                    is_quit_bot = False
+                # 單帳號模式：is_quit_bot = True，讓主迴圈正常退出並關閉 Chrome
 
         tixcraft_family = False
         if 'tixcraft.com' in url:
@@ -682,9 +706,10 @@ async def main(args):
         if tixcraft_family:
             is_quit_bot = await nodriver_tixcraft_main(tab, url, config_dict, ocr, Captcha_Browser)
             if is_quit_bot:
-                # 不自動暫停：讓多開實例可獨立運作
-                # 保留 is_quit_bot = False 以防止程式結束，但不建立暫停檔案
-                is_quit_bot = False
+                if is_multi_account_mode:
+                    # 多帳號模式：保持運行，讓 multi_account_manager 追蹤狀態
+                    is_quit_bot = False
+                # 單帳號模式：is_quit_bot = True，讓主迴圈正常退出並關閉 Chrome
 
         if 'famiticket.com' in url:
             await nodriver_famiticket_main(tab, url, config_dict)
@@ -713,11 +738,13 @@ async def main(args):
                 if tp_status.get("purchase_completed", False):
                     if config_dict["advanced"].get("verbose", False):
                         print("[SUCCESS] TicketPlus purchase completed")
-                    is_quit_bot = False
+                    if not is_multi_account_mode:
+                        is_quit_bot = True  # 單帳號模式：正常退出
                 elif tp_status.get("is_ticket_assigned", False) and '/confirm/' in url.lower():
                     if config_dict["advanced"].get("verbose", False):
                         print("[SUCCESS] TicketPlus on confirmation page, booking successful")
-                    is_quit_bot = False
+                    if not is_multi_account_mode:
+                        is_quit_bot = True  # 單帳號模式：正常退出
 
         if 'urbtix.hk' in url:
             #urbtix_main(driver, url, config_dict)
