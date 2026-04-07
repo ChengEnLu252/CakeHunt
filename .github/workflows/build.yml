@@ -98,6 +98,16 @@ jobs:
 
       - name: Package Mac output
         run: |
+          # 修復 PyInstaller 在 Mac 上產生的壞掉 Python symlink
+          # 指向 Python.framework/... 但實際檔案是 python3.11
+          for dir in dist/CakeHunt/_internal dist/nodriver_tixcraft/_internal; do
+            if [ -L "$dir/Python" ] && [ ! -e "$dir/Python" ]; then
+              rm "$dir/Python"
+              ln -s python3.11 "$dir/Python"
+              echo "[Fix] Repaired broken Python symlink in $dir"
+            fi
+          done
+
           chmod +x dist/CakeHunt/CakeHunt
           chmod +x dist/nodriver_tixcraft/nodriver_tixcraft
           xattr -cr dist/CakeHunt || true
