@@ -5,6 +5,7 @@ import base64
 import json
 import os
 import platform
+import signal
 import subprocess
 import sys
 import threading
@@ -152,6 +153,8 @@ def get_default_config():
     # Accounts section (cookies, accounts, passwords)
     config_dict['accounts']={}
     config_dict["accounts"]["tixcraft_sid"] = ""
+    config_dict["accounts"]["tixcraft_account"] = ""
+    config_dict["accounts"]["tixcraft_password"] = ""
     config_dict["accounts"]["ibonqware"] = ""
     config_dict["accounts"]["funone_session_cookie"] = ""
     config_dict["accounts"]["fansigo_cookie"] = ""
@@ -346,16 +349,16 @@ def stop_single_bot():
     """砍掉單帳號 bot 進程（Chrome 也會一起關閉）"""
     global _single_bot_process
     if _single_bot_process is not None:
-        if _single_bot_process.poll() is None:  # 還在跑
+        if _single_bot_process.poll() is None:
             try:
-                # 先砍整個進程群組（包含 Chrome 子進程）
-                import signal
-                try:
-                    if platform.system() != 'Windows':
+                if platform.system() != 'Windows':
+                    # Bot 以 start_new_session=True 啟動，有獨立 process group
+                    # 用 SIGTERM 砍整個 group（包含 Chrome 子進程）
+                    try:
                         os.killpg(os.getpgid(_single_bot_process.pid), signal.SIGTERM)
-                    else:
+                    except (ProcessLookupError, OSError):
                         _single_bot_process.terminate()
-                except Exception:
+                else:
                     _single_bot_process.terminate()
                 _single_bot_process.wait(timeout=8)
                 print("[BotManager] 舊的 bot 進程已終止")
@@ -367,7 +370,8 @@ def stop_single_bot():
                     pass
         _single_bot_process = None
 
-    # Mac 上 Chrome 需要額外時間釋放 user data dir lock
+    # 等待 Chrome 釋放 user data dir lock
+    # Mac 需要較長等待時間
     if platform.system() == 'Darwin':
         time.sleep(2)
     else:
@@ -408,6 +412,12 @@ def launch_maxbot():
         if len(window_size) > 0:
             cmd_argument.append('--window_size=' + window_size)
 
+        # Unix 使用 start_new_session=True 建立獨立 process group
+        # 這樣 stop_single_bot() 才能用 os.killpg() 一次砍掉 bot + Chrome
+        popen_kwargs = {"cwd": working_dir}
+        if platform.system() != 'Windows':
+            popen_kwargs["start_new_session"] = True
+
         try:
             if hasattr(sys, 'frozen'):
                 print("execute in frozen mode")
@@ -416,19 +426,21 @@ def launch_maxbot():
                     parent_dir = os.path.dirname(exe_dir)
                     bot_path = os.path.join(parent_dir, 'nodriver_tixcraft', 'nodriver_tixcraft')
                     if not os.path.exists(bot_path):
+                        # 合併目錄結構：bot 與 settings 在同一資料夾
                         bot_path = os.path.join(exe_dir, 'nodriver_tixcraft')
-                    config_path = os.path.join(exe_dir, 'settings.json')
-                    cmd = [bot_path, '--input=' + config_path] + cmd_argument
+                    # ⚠️ 不傳 --input，讓 bot 自行找 settings.json
+                    # 傳 --input 會讓 is_multi_account_mode = True，導致搶完不退出
+                    cmd = [bot_path] + cmd_argument
                 elif platform.system() == 'Windows':
                     cmd = [script_name + '.exe'] + cmd_argument
                 else:
                     cmd = ['./' + script_name] + cmd_argument
-                proc = subprocess.Popen(cmd, cwd=working_dir)
+                proc = subprocess.Popen(cmd, **popen_kwargs)
             else:
                 interpreter_binary = sys.executable
                 print("execute in shell mode.")
                 cmd_array = [interpreter_binary, script_name + '.py'] + cmd_argument
-                proc = subprocess.Popen(cmd_array, cwd=working_dir)
+                proc = subprocess.Popen(cmd_array, **popen_kwargs)
             _single_bot_process = proc
             print(f"[BotManager] Bot 啟動，PID: {proc.pid}")
         except Exception as exc:

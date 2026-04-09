@@ -62,6 +62,8 @@ const credit_card_prefix = document.querySelector('#credit_card_prefix');
 
 // auto fill
 const tixcraft_sid = document.querySelector('#tixcraft_sid');
+const tixcraft_account = document.querySelector('#tixcraft_account');
+const tixcraft_password = document.querySelector('#tixcraft_password');
 const ibonqware = document.querySelector('#ibonqware');
 const funone_session_cookie = document.querySelector('#funone_session_cookie');
 const fansigo_cookie = document.querySelector('#fansigo_cookie');
@@ -306,6 +308,8 @@ function load_settins_to_form(settings)
 
         // auto fill (accounts section)
         tixcraft_sid.value = settings.accounts.tixcraft_sid;
+        if (tixcraft_account) tixcraft_account.value = settings.accounts.tixcraft_account || '';
+        if (tixcraft_password) tixcraft_password.value = settings.accounts.tixcraft_password || '';
         ibonqware.value = settings.accounts.ibonqware;
         funone_session_cookie.value = settings.accounts.funone_session_cookie || '';
         fansigo_cookie.value = settings.accounts.fansigo_cookie || '';
@@ -565,6 +569,8 @@ function save_changes_to_dict(silent_flag)
 
             // auto fill (accounts section)
             settings.accounts.tixcraft_sid = tixcraft_sid.value;
+            settings.accounts.tixcraft_account = tixcraft_account ? tixcraft_account.value : '';
+            settings.accounts.tixcraft_password = tixcraft_password ? tixcraft_password.value : '';
             settings.accounts.ibonqware = ibonqware.value;
             settings.accounts.funone_session_cookie = funone_session_cookie.value;
             settings.accounts.fansigo_cookie = fansigo_cookie.value;
@@ -689,6 +695,8 @@ function check_unsaved_fields()
         });
         const field_list_accounts = [
             "tixcraft_sid",
+            "tixcraft_account",
+            "tixcraft_password",
             "ibonqware",
             "funone_session_cookie",
             "fansigo_cookie",

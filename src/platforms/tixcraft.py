@@ -41,6 +41,7 @@ from nodriver_common import (
 )
 
 __all__ = [
+    "nodriver_tixcraft_login",
     "nodriver_tixcraft_home_close_window",
     "nodriver_tixcraft_redirect",
     "nodriver_ticketmaster_parse_zone_info",
@@ -72,6 +73,133 @@ __all__ = [
 
 # Module-level state (replaces global tixcraft_dict)
 _state = {}
+
+
+async def nodriver_tixcraft_login(tab, config_dict):
+    """
+    處理拓元登入頁 (tixcraft.com/member/login)。
+    登入策略優先順序：直接帳密 > Facebook > 跳過
+    """
+    debug = util.create_debug_logger(config_dict)
+    # 點擊右上角登入按鈕，觸發登入 modal
+    try:
+        login_btn = await tab.query_selector('a[href*="login"], button[class*="login"], .member-login, a.login')
+        if login_btn:
+            await login_btn.click()
+            await asyncio.sleep(1.5)
+    except Exception:
+        pass
+
+    tixcraft_account  = config_dict["accounts"].get("tixcraft_account", "").strip()
+    tixcraft_password = config_dict["accounts"].get("tixcraft_password", "").strip()
+    facebook_account  = config_dict["accounts"].get("facebook_account", "").strip()
+
+    # ── 策略 1：直接帳密登入 ─────────────────────────────────────────────────
+    if len(tixcraft_account) > 3 and len(tixcraft_password) > 3:
+        debug.log("[TIXCRAFT LOGIN] 嘗試直接帳密登入")
+        try:
+            # 拓元登入表單 selectors（多種備用）
+            email_selectors = [
+                'input[name="email"]',
+                'input[type="email"]',
+                '#email',
+                'input[placeholder*="mail"]',
+            ]
+            pass_selectors = [
+                'input[name="password"]',
+                'input[type="password"]',
+                '#password',
+            ]
+
+            email_el = None
+            for sel in email_selectors:
+                try:
+                    email_el = await tab.query_selector(sel)
+                    if email_el:
+                        break
+                except Exception:
+                    pass
+
+            pass_el = None
+            for sel in pass_selectors:
+                try:
+                    pass_el = await tab.query_selector(sel)
+                    if pass_el:
+                        break
+                except Exception:
+                    pass
+
+            if email_el and pass_el:
+                await email_el.click()
+                await asyncio.sleep(0.3)
+                await email_el.send_keys(tixcraft_account)
+                await asyncio.sleep(0.3)
+                await pass_el.click()
+                await asyncio.sleep(0.3)
+                await pass_el.send_keys(tixcraft_password)
+                await asyncio.sleep(0.3)
+
+                # 按送出按鈕
+                submit_selectors = [
+                    'button[type="submit"]',
+                    'input[type="submit"]',
+                    'button.btn-primary',
+                    'button[name="submit"]',
+                ]
+                for sel in submit_selectors:
+                    try:
+                        btn = await tab.query_selector(sel)
+                        if btn:
+                            await btn.click()
+                            debug.log(f"[TIXCRAFT LOGIN] 已送出帳密登入表單")
+                            await asyncio.sleep(3.0)
+                            return True
+                    except Exception:
+                        pass
+
+                # fallback：按 Enter
+                from zendriver import cdp as _cdp
+                await tab.send(_cdp.input_.dispatch_key_event("keyDown", code="Enter", key="Enter", text="\r", windows_virtual_key_code=13))
+                await tab.send(_cdp.input_.dispatch_key_event("keyUp",   code="Enter", key="Enter", text="\r", windows_virtual_key_code=13))
+                debug.log("[TIXCRAFT LOGIN] 已用 Enter 送出登入")
+                await asyncio.sleep(3.0)
+                return True
+            else:
+                debug.log(f"[TIXCRAFT LOGIN] 找不到帳密輸入欄 (email={email_el is not None}, pass={pass_el is not None})")
+
+        except Exception as e:
+            debug.log(f"[TIXCRAFT LOGIN] 直接登入失敗：{e}")
+
+    # ── 策略 2：Facebook 登入（點拓元登入頁的 FB 按鈕）─────────────────────
+    elif len(facebook_account) > 4:
+        debug.log("[TIXCRAFT LOGIN] 嘗試 Facebook 登入")
+        try:
+            fb_selectors = [
+                'a[href*="facebook"]',
+                'a[href*="fb-login"]',
+                'button[class*="facebook"]',
+                'a[class*="facebook"]',
+                '.facebook-login',
+                '.fb-login',
+            ]
+            for sel in fb_selectors:
+                try:
+                    fb_btn = await tab.query_selector(sel)
+                    if fb_btn:
+                        await fb_btn.click()
+                        debug.log(f"[TIXCRAFT LOGIN] 已點擊 FB 登入按鈕 ({sel})")
+                        await asyncio.sleep(3.0)
+                        # Facebook OAuth 會重導向到 facebook.com/login.php?
+                        # nodriver_facebook_main 會在主迴圈自動接手
+                        return True
+                except Exception:
+                    pass
+            print("[TIXCRAFT LOGIN] 找不到 FB 登入按鈕，請確認頁面是否正確顯示")
+        except Exception as e:
+            print(f"[TIXCRAFT LOGIN] 登入失敗：{e}")
+            
+    print("[TIXCRAFT LOGIN] 登入失敗：找不到帳密欄位或登入按鈕，請確認帳號密碼是否正確")
+    return False
 
 
 async def nodriver_tixcraft_home_close_window(tab):
@@ -2812,26 +2940,28 @@ async def nodriver_tixcraft_main(tab, url, config_dict, ocr, Captcha_Browser):
 
     await nodriver_tixcraft_home_close_window(tab)
 
+    # ── 偵測拓元登入頁，自動處理登入 ────────────────────────────────────────
+    if ('/member/login' in url or '#login' in url or '/login' in url) and 'tixcraft.com' in url:
+        login_done = await nodriver_tixcraft_login(tab, config_dict)
+        if login_done:
+            await asyncio.sleep(2.0)
+            # 登入後導向目標活動網址
+            try:
+                await tab.get(config_dict["homepage"])
+            except Exception:
+                pass
+        return False
+
     # special case for same event re-open, redirect to user's homepage.
     # Add cooldown to prevent infinite redirect loop when area page is unavailable
     # Match homepage URLs: tixcraft.com, tixcraft.com/, tixcraft.com/activity
     is_tixcraft_home = url in ['https://tixcraft.com', 'https://tixcraft.com/', 'https://tixcraft.com/activity']
     if is_tixcraft_home:
-        if "/ticket/area/" in config_dict["homepage"]:
-            if len(config_dict["homepage"].split('/'))==7:
-                current_time = time.time()
-                last_redirect_time = _state.get("last_homepage_redirect_time", 0)
-                # Use auto_reload_page_interval from settings, default to 3 seconds
-                redirect_interval = config_dict["advanced"].get("auto_reload_page_interval", 3)
-                if redirect_interval <= 0:
-                    redirect_interval = 3  # Minimum 3 seconds to prevent rapid loop
-
-                if current_time - last_redirect_time > redirect_interval:
-                    try:
-                        _state["last_homepage_redirect_time"] = current_time
-                        await tab.get(config_dict["homepage"])
-                    except Exception as e:
-                        pass
+        if "/ticket/area/" in config_dict["homepage"] or "/activity/detail/" in config_dict["homepage"] or "/activity/game/" in config_dict["homepage"]:
+            try:
+                await tab.get(config_dict["homepage"])
+            except Exception:
+                pass
 
     if "/activity/detail/" in url:
         _state["start_time"] = time.time()
@@ -2992,4 +3122,3 @@ async def nodriver_tixcraft_main(tab, url, config_dict, ocr, Captcha_Browser):
             _state["printed_completed"] = True
 
     return is_quit_bot
-

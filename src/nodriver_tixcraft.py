@@ -135,9 +135,27 @@ async def nodriver_goto_homepage(driver, config_dict):
         if len(config_dict["accounts"]["ticketplus_account"]) > 1:
             homepage = "https://ticketplus.com.tw/"
 
+    # 拓元有帳密時，先去登入頁
+    _go_url = homepage
+    _tixcraft_need_login = False
+    if 'tixcraft.com' in homepage:
+        _tc_account = config_dict["accounts"].get("tixcraft_account", "").strip()
+        _tc_password = config_dict["accounts"].get("tixcraft_password", "").strip()
+        _fb_account  = config_dict["accounts"].get("facebook_account", "").strip()
+        _tc_sid      = config_dict["accounts"]["tixcraft_sid"]
+        if (len(_tc_account) > 3 and len(_tc_password) > 3) or \
+                (len(_fb_account) > 4 and len(_tc_sid) <= 1):
+            _go_url = "https://tixcraft.com/member/login"
+            _tixcraft_need_login = True
     try:
-        tab = await driver.get(homepage)
-        await asyncio.sleep(random.uniform(1.0, 2.5))
+        tab = await driver.get(_go_url)
+        await asyncio.sleep(random.uniform(2.0, 3.0))
+        if _tixcraft_need_login:
+            current_url = tab.target.url if hasattr(tab, 'target') and tab.target else ""
+            if '/member/login' not in current_url and '#login' not in current_url and '/login' not in current_url:
+                debug.log("[TIXCRAFT] 已登入，直接導向目標頁")
+                tab = await driver.get(homepage)
+                await asyncio.sleep(random.uniform(1.0, 2.0))
     except Exception as e:
         print(f"[ERROR] Failed to navigate to homepage: {e}")
 
@@ -152,6 +170,13 @@ async def nodriver_goto_homepage(driver, config_dict):
         tixcraft_family = True
 
     if tixcraft_family:
+        # ── 登入策略判斷 ─────────────────────────────────────────────────────
+        # 優先順序：直接帳密 > Facebook > Cookie(tixcraft_sid)
+        tixcraft_account  = config_dict["accounts"].get("tixcraft_account", "").strip()
+        tixcraft_password = config_dict["accounts"].get("tixcraft_password", "").strip()
+        facebook_account  = config_dict["accounts"].get("facebook_account", "").strip()
+        tixcraft_sid      = config_dict["accounts"]["tixcraft_sid"]
+
         # Determine correct cookie domain and name based on homepage
         # Each site uses different session cookie names (Issue #207)
         if 'ticketmaster.sg' in homepage:
@@ -167,7 +192,6 @@ async def nodriver_goto_homepage(driver, config_dict):
             cookie_domain = ".tixcraft.com"
             cookie_name = "TIXUISID"
 
-        tixcraft_sid = config_dict["accounts"]["tixcraft_sid"]
         if len(tixcraft_sid) > 1:
             debug.log(f"[TIXCRAFT] Setting {cookie_name} cookie, length: {len(tixcraft_sid)}")
 
@@ -520,8 +544,9 @@ async def main(args):
             else:
                 print(f"[Chrome] 找不到Chrome：{_mac_chrome}")
 
-        # Chrome 啟動重試：user data dir 可能被上一個 Chrome 鎖住，最多重試 3 次
-        max_chrome_retries = 3
+        # Chrome 啟動重試：user data dir 可能被上一個 Chrome 鎖住，最多重試 5 次
+        max_chrome_retries = 5
+        driver = None
         for chrome_retry in range(max_chrome_retries):
             try:
                 driver = await uc.start(conf, no_sandbox=True, headless=config_dict["advanced"]["headless"])
@@ -540,8 +565,11 @@ async def main(args):
                         if _os.path.exists(_mac_chrome):
                             conf.browser_executable_path = _mac_chrome
                 else:
-                    print("[Chrome] 已達最大重試次數，放棄啟動")
-                    raise
+                    # 全部重試失敗：印出錯誤但正常退出，讓使用者可以再按一次搶票
+                    # 不用 raise，避免程式崩潰
+                    print("[Chrome] 已達最大重試次數，Chrome 無法啟動")
+                    print("[Chrome] 請再按一次「搶票」重試，或確認 Chrome 是否正常安裝")
+                    return
         #driver = await uc.start(conf, sandbox=sandbox, headless=config_dict["advanced"]["headless"])
         #driver = await uc.start(conf)
         if not driver is None:
