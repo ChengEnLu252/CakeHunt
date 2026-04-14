@@ -417,6 +417,12 @@ def launch_maxbot():
         popen_kwargs = {"cwd": working_dir}
         if platform.system() != 'Windows':
             popen_kwargs["start_new_session"] = True
+        # Mac frozen 模式：bot 的 cwd 要指向解壓縮根目錄
+        # 因為 settings.json 存在那裡，bot 啟動後才找得到
+        if hasattr(sys, 'frozen') and platform.system() == 'Darwin':
+            exe_dir = os.path.dirname(sys.executable)
+            parent_dir = os.path.dirname(exe_dir)
+            popen_kwargs["cwd"] = parent_dir
 
         try:
             if hasattr(sys, 'frozen'):
