@@ -432,7 +432,12 @@ def launch_maxbot():
                     # 傳 --input 會讓 is_multi_account_mode = True，導致搶完不退出
                     cmd = [bot_path] + cmd_argument
                 elif platform.system() == 'Windows':
-                    cmd = [script_name + '.exe'] + cmd_argument
+                    # 必須用完整路徑，subprocess 找 exe 的搜尋範圍與 cwd 無關
+                    _exe_dir = os.path.dirname(os.path.abspath(sys.executable))
+                    _bot_path = os.path.join(_exe_dir, script_name + '.exe')
+                    print(f"[BotManager] Windows bot 路徑：{_bot_path}")
+                    print(f"[BotManager] 路徑存在：{os.path.exists(_bot_path)}")
+                    cmd = [_bot_path] + cmd_argument
                 else:
                     cmd = ['./' + script_name] + cmd_argument
                 proc = subprocess.Popen(cmd, **popen_kwargs)
@@ -559,9 +564,15 @@ class PauseHandler(tornado.web.RequestHandler):
     def get(self):
         maxbot_idle()
         self.write({"pause": True})
+    def post(self):
+        maxbot_idle()
+        self.write({"pause": True})
 
 class ResumeHandler(tornado.web.RequestHandler):
     def get(self):
+        maxbot_resume()
+        self.write({"resume": True})
+    def post(self):
         maxbot_resume()
         self.write({"resume": True})
 
@@ -934,6 +945,49 @@ class MultiAccountConfigHandler(tornado.web.RequestHandler):
         config_dict["multi_accounts"] = body.get("multi_accounts", [])
         util.save_json(config_dict, config_path)
         self.write(json.dumps({"success": True}))
+        
+class MultiAccountPauseHandler(tornado.web.RequestHandler):
+    """暫停單一帳號的搶票（寫入暫停檔，bot 偵測到後會進入 idle 狀態）"""
+    def set_default_headers(self):
+        self.set_header("Access-Control-Allow-Origin", "*")
+        self.set_header("Content-Type", "application/json; charset=utf-8")
+    def post(self, account_id):
+        import tempfile
+        pause_file = os.path.join(tempfile.gettempdir(), f"cakehunt_pause_{account_id}.txt")
+        try:
+            with open(pause_file, "w") as f:
+                f.write("")
+            # 同時更新 multi_manager 的狀態顯示
+            acc = multi_manager.get_account(account_id)
+            if acc:
+                from multi_account_manager import STATUS_PAUSED
+                acc.status = STATUS_PAUSED
+                acc.add_log("[MultiAccount] 已送出暫停指令")
+                multi_manager._broadcast({"type": "status_update", "account": acc.to_dict()})
+            self.write(json.dumps({"success": True}))
+        except Exception as e:
+            self.write(json.dumps({"success": False, "message": str(e)}))
+
+class MultiAccountResumeHandler(tornado.web.RequestHandler):
+    """繼續單一帳號的搶票（刪除暫停檔）"""
+    def set_default_headers(self):
+        self.set_header("Access-Control-Allow-Origin", "*")
+        self.set_header("Content-Type", "application/json; charset=utf-8")
+    def post(self, account_id):
+        import tempfile
+        pause_file = os.path.join(tempfile.gettempdir(), f"cakehunt_pause_{account_id}.txt")
+        try:
+            if os.path.exists(pause_file):
+                os.remove(pause_file)
+            acc = multi_manager.get_account(account_id)
+            if acc:
+                from multi_account_manager import STATUS_RUNNING
+                acc.status = STATUS_RUNNING
+                acc.add_log("[MultiAccount] 已送出繼續指令")
+                multi_manager._broadcast({"type": "status_update", "account": acc.to_dict()})
+            self.write(json.dumps({"success": True}))
+        except Exception as e:
+            self.write(json.dumps({"success": False, "message": str(e)}))
 
 async def main_server():
     ocr = None
@@ -953,6 +1007,8 @@ async def main_server():
         ("/status", StatusHandler),
         ("/pause", PauseHandler),
         ("/resume", ResumeHandler),
+        (r"/multi_accounts/pause/(.+)",  MultiAccountPauseHandler),
+        (r"/multi_accounts/resume/(.+)", MultiAccountResumeHandler),
         ("/run", RunHandler),
         
         # json api

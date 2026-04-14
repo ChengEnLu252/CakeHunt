@@ -227,6 +227,8 @@ jobs:
             --hidden-import pyperclip \
             --hidden-import platform \
             --hidden-import signal \
+            --collect-all zendriver \
+            --collect-all ddddocr \
             --name "nodriver_tixcraft" \
             src/nodriver_tixcraft.py
 

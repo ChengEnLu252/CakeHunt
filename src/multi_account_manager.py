@@ -245,6 +245,14 @@ class MultiAccountManager:
                 # 開發模式：用 Python 執行 .py
                 _cmd = [_sys.executable, "-u", self._bot_script, "--input", config_path]
 
+            # Mac：清除 Gatekeeper quarantine，否則打包後子程序會被擋住無法執行
+            if _sys.platform == 'darwin':
+                try:
+                    import subprocess as _sp_xa
+                    _sp_xa.run(['xattr', '-cr', _cmd[0]], capture_output=True, timeout=5)
+                except Exception:
+                    pass
+
             proc = subprocess.Popen(
                 _cmd,
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT,

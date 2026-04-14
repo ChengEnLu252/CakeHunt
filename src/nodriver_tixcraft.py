@@ -607,6 +607,16 @@ async def main(args):
     # 單帳號模式（從前端按搶票）：args.input 為 None → 搶完後正常退出
     # 多帳號模式（multi_account_manager 啟動）：args.input 有值 → 保持運行讓 manager 追蹤
     is_multi_account_mode = bool(args and args.input)
+    # 多帳號模式：解析 account_id，用來讀取個別暫停檔
+    _account_id = None
+    if is_multi_account_mode and args and args.input:
+        try:
+            import re as _re
+            _m = _re.search(r'cakehunt_acc_([^.]+)\.json', args.input)
+            if _m:
+                _account_id = _m.group(1)
+        except Exception:
+            pass
 
     url = ""
     last_url = ""
@@ -673,6 +683,12 @@ async def main(args):
             is_refresh_datetime_sent = await check_refresh_datetime_occur(tab, config_dict["refresh_datetime"])
 
         is_maxbot_paused = await check_and_handle_pause(config_dict)
+        # 多帳號模式：額外檢查此帳號專屬的暫停檔
+        if not is_maxbot_paused and _account_id:
+            import tempfile as _tmpmod
+            _acc_pause_file = os.path.join(_tmpmod.gettempdir(), f"cakehunt_pause_{_account_id}.txt")
+            if os.path.exists(_acc_pause_file):
+                is_maxbot_paused = True
 
         # Detect pause state change and show message immediately
         if is_maxbot_paused and not last_paused_state:

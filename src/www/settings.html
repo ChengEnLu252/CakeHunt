@@ -1114,7 +1114,10 @@ h2::after {
 
         <div class="row mb-4">
           <div class="col-12 d-flex gap-2 flex-wrap align-items-center">
-            <small class="text-muted" style="font-size:0.8rem;">帳號設定請至「自動填表單」頁籤後，至底部按「多帳號搶票」啟動</small>
+            <button class="btn btn-warning" id="pause_btn">⏸ 全體暫停</button>
+            <button class="btn btn-success" id="resume_btn">▶ 全體繼續</button>
+            <button class="btn btn-outline-danger btn-sm" id="ma-stop-all-btn">■ 全體停止</button>
+            <small class="text-muted ms-2" style="font-size:0.8rem;">帳號設定請至「自動填表單」頁籤後，至底部按「多帳號搶票」啟動</small>
           </div>
         </div>
 
@@ -1239,6 +1242,10 @@ h2::after {
               + '<span class="input-group-text" style="background:#1877f2;color:#fff;font-size:0.8rem;">FB 密碼</span>'
               + '<input type="password" class="form-control ma-row-fb-password" placeholder="Facebook 密碼（可選）" value="' + (ao['facebook_password'] || '') + '">'
               + '</div>'
+              + '<div class="input-group mb-2" id="ma-sid-row-' + idx + '" style="' + (platform === 'tixcraft' ? '' : 'display:none;') + '">'
+              + '<span class="input-group-text" style="background:#ff6b35;color:#fff;font-size:0.8rem;">TIXUISID</span>'
+              + '<input type="text" class="form-control ma-row-tixuisid" placeholder="tixcraft_sid cookie 值（登入後取得）" value="' + (ao['tixcraft_sid'] || '') + '">'
+              + '</div>'
               + '<div class="input-group">'
               + '<span class="input-group-text">目標網址</span>'
               + '<input type="text" class="form-control ma-row-homepage" placeholder="https://kktix.com/events/..." value="' + (entry.homepage || '') + '">'
@@ -1259,10 +1266,11 @@ h2::after {
 
 
   function maToggleFbRow(sel, idx) {
-      var fbRow = document.getElementById('ma-fb-row-' + idx);
-      if (!fbRow) return;
-      var p = sel.value;
-      fbRow.style.display = (p === 'tixcraft' || p === 'kktix') ? '' : 'none';
+    var fbRow  = document.getElementById('ma-fb-row-' + idx);
+    var sidRow = document.getElementById('ma-sid-row-' + idx);
+    var p = sel.value;
+    if (fbRow)  fbRow.style.display  = (p === 'tixcraft' || p === 'kktix') ? '' : 'none';
+    if (sidRow) sidRow.style.display = (p === 'tixcraft') ? '' : 'none';
   }
 
   function maAddAccount() {
@@ -1273,9 +1281,11 @@ h2::after {
           var platform = row.querySelector('.ma-row-platform') ? row.querySelector('.ma-row-platform').value : 'kktix';
           var account  = row.querySelector('.ma-row-account')  ? row.querySelector('.ma-row-account').value.trim()  : '';
           var password = row.querySelector('.ma-row-password') ? row.querySelector('.ma-row-password').value.trim() : '';
+          var tixuisid = row.querySelector('.ma-row-tixuisid') ? row.querySelector('.ma-row-tixuisid').value.trim() : '';
           var ao = {};
           if (account)  ao[platform + '_account']  = account;
           if (password) ao[platform + '_password'] = password;
+          if (tixuisid)  ao['tixcraft_sid']         = tixuisid;
           window.maConfigList[idx].platform      = platform;
           window.maConfigList[idx].name          = account || ('帳號 ' + (idx + 1));
           window.maConfigList[idx].homepage      = row.querySelector('.ma-row-homepage') ? row.querySelector('.ma-row-homepage').value.trim() : '';
@@ -1345,11 +1355,13 @@ h2::after {
                   var password = row.querySelector('.ma-row-password') ? row.querySelector('.ma-row-password').value.trim() : '';
                   var fbAccount  = row.querySelector('.ma-row-fb-account')  ? row.querySelector('.ma-row-fb-account').value.trim()  : '';
                   var fbPassword = row.querySelector('.ma-row-fb-password') ? row.querySelector('.ma-row-fb-password').value.trim() : '';
+                  var tixuisid   = row.querySelector('.ma-row-tixuisid')    ? row.querySelector('.ma-row-tixuisid').value.trim()    : '';
                   var ao = {};
                   if (account)    ao[platform + '_account']  = account;
                   if (password)   ao[platform + '_password'] = password;
                   if (fbAccount)  ao['facebook_account']  = fbAccount;
                   if (fbPassword) ao['facebook_password'] = fbPassword;
+                  if (tixuisid)   ao['tixcraft_sid']       = tixuisid;
                   result.push({
                       id:            row.querySelector('.ma-row-id') ? row.querySelector('.ma-row-id').value : ('acc_' + idx),
                       name:          account || ('帳號 ' + (idx + 1)),
@@ -1384,11 +1396,13 @@ h2::after {
                   var password = row.querySelector('.ma-row-password') ? row.querySelector('.ma-row-password').value.trim() : '';
                   var fbAccount  = row.querySelector('.ma-row-fb-account')  ? row.querySelector('.ma-row-fb-account').value.trim()  : '';
                   var fbPassword = row.querySelector('.ma-row-fb-password') ? row.querySelector('.ma-row-fb-password').value.trim() : '';
+                  var tixuisid   = row.querySelector('.ma-row-tixuisid')    ? row.querySelector('.ma-row-tixuisid').value.trim()    : '';
                   var ao = {};
                   if (account)    ao[platform + '_account']  = account;
                   if (password)   ao[platform + '_password'] = password;
                   if (fbAccount)  ao['facebook_account']  = fbAccount;
                   if (fbPassword) ao['facebook_password'] = fbPassword;
+                  if (tixuisid)   ao['tixcraft_sid']       = tixuisid;
                   result.push({
                       id:            row.querySelector('.ma-row-id') ? row.querySelector('.ma-row-id').value : ('acc_' + idx),
                       name:          account || ('帳號 ' + (idx + 1)),
@@ -1475,6 +1489,12 @@ h2::after {
                           return '<div style="color:'+color+';padding:1px 0;">'+line.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</div>';
                       }).join('');
                       var aid = acc.account_id;
+                      var isPaused = acc.status === 'paused';
+                      var pauseResumeBtn = acc.is_running
+                          ? (isPaused
+                              ? '<button class="btn btn-sm btn-outline-success" onclick="maResumeAccount(\''+aid+'\')">▶ 繼續</button>'
+                              : '<button class="btn btn-sm btn-outline-warning" onclick="maPauseAccount(\''+aid+'\')">⏸ 暫停</button>')
+                          : '';
                       var runBtn = acc.is_running
                           ? '<button class="btn btn-sm btn-outline-primary" onclick="maStopAccount(\''+aid+'\')">■ 停止</button>'
                           : '<button class="btn btn-sm btn-primary" onclick="maRemoveAccount(\''+aid+'\')">🗑 移除</button>';
@@ -1488,7 +1508,7 @@ h2::after {
                           + '<div class="mb-2" style="font-size:0.75rem;color:var(--pink);word-break:break-all;">'+(acc.current_url||'尚未訪問任何頁面')+'</div>'
                           + '<div style="background:#111;border-radius:6px;padding:6px 8px;height:110px;overflow-y:auto;font-family:monospace;font-size:0.72rem;line-height:1.5;">'+logHtml+'</div>'
                           + '</div>'
-                          + '<div class="card-footer d-flex gap-2 py-2">'+runBtn+'</div>'
+                          + '<div class="card-footer d-flex gap-2 py-2">'+pauseResumeBtn+runBtn+'</div>'
                           + '</div>';
                       if (!card) {
                           var col = document.createElement('div');
@@ -1525,6 +1545,18 @@ h2::after {
       window.maRemoveAccount = function(id) {
           if (!confirm('確定移除？')) return;
           fetch('/multi_accounts/control/' + id + '?action=remove', {method:'POST'});
+      };
+
+      window.maPauseAccount = function(id) {
+          fetch('/multi_accounts/pause/' + id, {method:'POST'})
+              .then(function(r) { return r.json(); })
+              .then(function(d) { if (!d.success) alert('暫停失敗：' + d.message); });
+      };
+
+      window.maResumeAccount = function(id) {
+          fetch('/multi_accounts/resume/' + id, {method:'POST'})
+              .then(function(r) { return r.json(); })
+              .then(function(d) { if (!d.success) alert('繼續失敗：' + d.message); });
       };
 
   });
