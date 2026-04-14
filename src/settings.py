@@ -421,9 +421,8 @@ def launch_maxbot():
         # 因為 settings.json 存在那裡，bot 啟動後才找得到
         if hasattr(sys, 'frozen') and platform.system() == 'Darwin':
             exe_dir = os.path.dirname(sys.executable)
-            parent_dir = os.path.dirname(exe_dir)
-            popen_kwargs["cwd"] = parent_dir
-
+            popen_kwargs["cwd"] = exe_dir
+            
         try:
             if hasattr(sys, 'frozen'):
                 print("execute in frozen mode")
@@ -1065,11 +1064,14 @@ def get_server_port():
 def web_server():
     server_port = get_server_port()
     is_port_binded = util.is_connectable(server_port)
-    #print("is_port_binded:", is_port_binded)
     if not is_port_binded:
         asyncio.run(main_server())
     else:
-        print("port:", server_port, " is in used.")
+        # port 已被佔用：直接開啟瀏覽器，不重複啟動 server
+        import webbrowser
+        url = "http://127.0.0.1:" + str(server_port) + "/index.html"
+        print("port already in use, opening browser:", url)
+        webbrowser.open_new(url)
 
 def settgins_gui_timer():
     while True:
