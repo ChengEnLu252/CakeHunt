@@ -97,16 +97,18 @@ def is_arm():
     return ret
 
 def get_app_root():
-    app_root = ""
     if hasattr(sys, 'frozen'):
-        # Frozen executable (PyInstaller)
-        basis = sys.executable
-        app_root = os.path.dirname(basis)
+        app_root = os.path.dirname(sys.executable)
+        # nodriver_tixcraft 是獨立資料夾，settings.json 在 CakeHunt/ 裡
+        # 若自己目錄沒有 settings.json，去隔壁 CakeHunt/ 找
+        if not os.path.exists(os.path.join(app_root, 'settings.json')):
+            parent = os.path.dirname(app_root)
+            cakehunt_dir = os.path.join(parent, 'CakeHunt')
+            if os.path.exists(os.path.join(cakehunt_dir, 'settings.json')):
+                app_root = cakehunt_dir
+        return app_root
     else:
-        # Running from source - return the directory where this script is located
-        # This ensures we always get the src/ directory regardless of cwd
-        app_root = os.path.dirname(os.path.abspath(__file__))
-    return app_root
+        return os.path.dirname(os.path.abspath(__file__))
 
 
 def format_keyword_for_display(keyword_string):
