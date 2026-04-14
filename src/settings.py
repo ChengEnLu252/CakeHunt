@@ -422,6 +422,9 @@ def launch_maxbot():
         if hasattr(sys, 'frozen') and platform.system() == 'Darwin':
             exe_dir = os.path.dirname(sys.executable)
             popen_kwargs["cwd"] = exe_dir
+            print(f"[BotManager] exe_dir: {exe_dir}")
+            print(f"[BotManager] cwd設定: {exe_dir}")
+            print(f"[BotManager] settings.json存在: {os.path.exists(os.path.join(exe_dir, 'settings.json'))}")
             
         try:
             if hasattr(sys, 'frozen'):
